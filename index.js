@@ -5,8 +5,10 @@ const circuitFilenames = [
   "nor.json",
   "latch.json",
   "latch2.json",
+  "latch_min.json",
   "latch_failed.json",
-  "2_bit_decoder.json"
+  "2_bit_decoder.json",
+  "xor.json"
 ];
 let width;
 let height;
