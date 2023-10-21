@@ -1,126 +1,26 @@
+const circuitFilenames = [
+  "and.json",
+  "and2.json",
+  "or.json",
+  "nor.json",
+  "latch.json",
+  "latch2.json",
+  "latch_failed.json",
+  "2_bit_decoder.json"
+];
 let width;
 let height;
 let cells = [];
+let circuitData;
 
 function makeCell(kind, pushingTo) {
   return { kind, pushingTo };
 }
 
-onload = () => {
-  const strs = (() => {
-    // OR
-    if (0) {
-      return [
-        "        ",
-        " # #    ",
-        " # #    ",
-        " # #    ",
-        " #####  ",
-        " #   #  ",
-        " #####  ",
-        " #   #  ",
-      ];
-    }
-    // NOR
-    if (0) {
-      return [
-        "        ",
-        " # #    ",
-        " # #    ",
-        " ###    ",
-        "   #    ",
-        " E #    ",
-        " ###    ",
-        " #      ",
-      ];
-    }
-    // AND
-    if (0) {
-      return [
-        "        ",
-        " # #    ",
-        " # #    ",
-        " # #    ",
-        " I##    ",
-        " #      ",
-        " #      ",
-        "        ",
-      ];
-    }
-    // NAND
-    if (0) {
-      return [
-        "        ",
-        " # #    ",
-        " ##I    ",
-        "   #    ",
-        " E #    ",
-        " C##    ",
-        " #      ",
-        "        ",
-        "        ",
-      ];
-    }
-    // AND2
-    if (1) {
-      return [
-        "         ",
-        " # # #   ",
-        " # # #   ",
-        " # # ### ",
-        " # #   # ",
-        " # #   # ",
-        " # ##  # ",
-        " #  #  # ",
-        " ## ## # ",
-        "  #  # # ",
-        " E+ E+ # ",
-        " C# C# # ",
-        " #  #  # ",
-        " ####  # ",
-        "   #   # ",
-        "  E+   # ",
-        "  C#   # ",
-        "  #    # ",
-        "  ###### ",
-        "         ",
-      ];
-    }
-    // BRIDGE
-    if (0) {
-      return [
-        "        ",
-        " # #    ",
-        " # #    ",
-        " # #    ",
-        " # #    ",
-        " ##+##  ",
-        "   # #  ",
-        " ##+##  ",
-        " # #    ",
-      ];
-    }
-    if (0) {
-      return [
-        "        ",
-        " # #    ",
-        " # #    ",
-        " # #    ",
-        " # #    ",
-        " ##+##  ",
-        "   # #  ",
-        " ##+##  ",
-        " # #    ",
-        " # #    ",
-        " ##I    ",
-        "   #    ",
-        " E #    ",
-        " C##    ",
-        " #      ",
-        "        ",
-      ];
-    }
-  })();
+async function loadCircuit(filename) {
+  const res = await fetch("circuits/" + filename);
+  circuitData = await res.json();
+  const strs = circuitData.dataStrs;
   height = strs.length;
   width = strs[0].length;
   for (let y = 0; y < height; ++y) {
@@ -145,14 +45,37 @@ onload = () => {
       }
     }
   }
-  const canvas = document.createElement("canvas");
+  let canvas = document.querySelector("canvas");
+  if (!canvas) {
+    canvas = document.createElement("canvas");
+    document.body.append(canvas);
+    canvas.style.imageRendering = "pixelated";
+  }
   canvas.width = width;
   canvas.height = height;
-  canvas.style.imageRendering = "pixelated";
   const scale = Math.min(Math.max(Math.floor(512 / Math.max(width, height)), 1), 16);
   canvas.style.width = `${scale * width}px`;
   canvas.style.height = `${scale * height}px`;
-  document.body.append(canvas);
+}
+
+function createCircuitButton(filename) {
+  const button = document.createElement("button");
+  button.innerHTML = filename;
+  button.onclick = () => {
+    loadCircuit(filename);
+  }
+  return button;
+}
+
+onload = async () => {
+  const ul = document.createElement("ul");
+  circuitFilenames.forEach((filename) => {
+    const li = document.createElement("li");
+    const button = createCircuitButton(filename);
+    li.append(button);
+    ul.append(li);
+  });
+  document.body.append(ul);
   requestAnimationFrame(update);
 };
 
@@ -221,18 +144,20 @@ function renderCell(imageData, x, y, cell) {
 let c = 0;
 
 function update() {
+  //setTimeout(() => requestAnimationFrame(update), 100);
   requestAnimationFrame(update);
-  c++;
+  if (!circuitData) {
+    return;
+  }
+  {
+    const changes = circuitData.changes;
+    const cycleCount = circuitData.cycleCount;
+    const i = Math.floor(c / cycleCount) % changes.length;
+    cells[1][1].kind = changes[i][0] ? "Emitter" : "Transmitter";
+    cells[1][3].kind = changes[i][1] ? "Emitter" : "Transmitter";
+    c++;
+  }
   prevCells = JSON.parse(JSON.stringify(cells));
-  const table = [
-    [0, 0],
-    [1, 0],
-    [0, 1],
-    [1, 1],
-  ];
-  const ti = Math.floor(c / 120) % table.length;
-  cells[1][1].kind = table[ti][0] ? "Emitter" : "None";
-  cells[1][3].kind = table[ti][1] ? "Emitter" : "None";
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       updateCell(
