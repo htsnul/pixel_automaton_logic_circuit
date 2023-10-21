@@ -47,17 +47,16 @@ async function loadCircuit(filename) {
       }
     }
   }
-  let canvas = document.querySelector("canvas");
-  if (!canvas) {
-    canvas = document.createElement("canvas");
-    document.body.append(canvas);
+  {
+    const canvas = document.createElement("canvas");
     canvas.style.imageRendering = "pixelated";
+    canvas.width = width;
+    canvas.height = height;
+    const scale = Math.min(Math.max(Math.floor(512 / Math.max(width, height)), 1), 16);
+    canvas.style.width = `${scale * width}px`;
+    canvas.style.height = `${scale * height}px`;
+    document.querySelector("main").replaceChildren(canvas);
   }
-  canvas.width = width;
-  canvas.height = height;
-  const scale = Math.min(Math.max(Math.floor(512 / Math.max(width, height)), 1), 16);
-  canvas.style.width = `${scale * width}px`;
-  canvas.style.height = `${scale * height}px`;
 }
 
 function createCircuitButton(filename) {
@@ -69,7 +68,7 @@ function createCircuitButton(filename) {
   return button;
 }
 
-onload = async () => {
+function prepareList() {
   const ul = document.createElement("ul");
   circuitFilenames.forEach((filename) => {
     const li = document.createElement("li");
@@ -77,7 +76,25 @@ onload = async () => {
     li.append(button);
     ul.append(li);
   });
-  document.body.append(ul);
+  document.querySelector("main").replaceChildren(ul);
+}
+
+onload = async () => {
+  {
+    const header = document.createElement("header");
+    {
+      const button = document.createElement("button");
+      button.innerHTML = "List";
+      button.onclick = () => prepareList();
+      header.append(button);
+    }
+    document.body.append(header);
+  }
+  {
+    const main = document.createElement("main");
+    document.body.append(main);
+  }
+  prepareList();
   requestAnimationFrame(update);
 };
 
