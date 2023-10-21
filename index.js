@@ -4,6 +4,8 @@ const circuitFilenames = [
   "or.json",
   "nor.json",
   "xor.json",
+  "half_adder.json",
+  "full_adder.json",
   "latch.json",
   "2_bit_decoder.json"
 ];
