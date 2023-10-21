@@ -1,19 +1,17 @@
 const circuitFilenames = [
+  "neg.json",
   "and.json",
-  "and2.json",
   "or.json",
   "nor.json",
+  "xor.json",
   "latch.json",
-  "latch2.json",
-  "latch_min.json",
-  "latch_failed.json",
-  "2_bit_decoder.json",
-  "xor.json"
+  "2_bit_decoder.json"
 ];
 let width;
 let height;
 let cells = [];
 let circuitData;
+let frameIndex = 0;
 
 function makeCell(kind, pushingTo) {
   return { kind, pushingTo };
@@ -57,6 +55,7 @@ async function loadCircuit(filename) {
     canvas.style.height = `${scale * height}px`;
     document.querySelector("main").replaceChildren(canvas);
   }
+  frameIndex = 0;
 }
 
 function createCircuitButton(filename) {
@@ -169,12 +168,16 @@ function update() {
     return;
   }
   {
-    const changes = circuitData.changes;
     const cycleCount = circuitData.cycleCount;
-    const i = Math.floor(c / cycleCount) % changes.length;
-    cells[1][1].kind = changes[i][0] ? "Emitter" : "Transmitter";
-    cells[1][3].kind = changes[i][1] ? "Emitter" : "Transmitter";
-    c++;
+    const inputCount = circuitData.inputCount;
+    const values = circuitData.values;
+    const valueIndex = Math.floor(frameIndex / cycleCount) % values.length;
+    for (let inputIdx = 0; inputIdx < inputCount; ++inputIdx) {
+      const x = circuitData.positions[inputIdx][0];
+      const y = circuitData.positions[inputIdx][1];
+      cells[y][x].kind = values[valueIndex][inputIdx] ? "Emitter" : "Transmitter";
+    }
+    frameIndex++;
   }
   prevCells = JSON.parse(JSON.stringify(cells));
   for (let y = 0; y < height; y++) {
