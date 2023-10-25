@@ -1,5 +1,5 @@
 const circuitFilenames = [
-  "neg.json",
+  "not.json",
   "and.json",
   "or.json",
   "nor.json",
@@ -7,6 +7,7 @@ const circuitFilenames = [
   "half_adder.json",
   "full_adder.json",
   "latch.json",
+  "delay.json",
   "2_bit_decoder.json"
 ];
 let width;
@@ -14,6 +15,7 @@ let height;
 let cells = [];
 let circuitData;
 let frameIndex = 0;
+let clockIsOn = false;
 
 function makeCell(kind, pushingTo) {
   return { kind, pushingTo };
@@ -34,6 +36,8 @@ async function loadCircuit(filename) {
       );
       if (str[x] === "E") {
         cells[y][x].kind = "Emitter";
+      } else if (str[x] === "L") {
+        cells[y][x].kind = "Clock";
       } else if (str[x] === "#") {
         cells[y][x].kind = "Transmitter";
       } else if (str[x] === "+") {
@@ -105,6 +109,11 @@ function updateCell(x, y, cell, pushedFrom) {
     cell.pushingTo.r = true;
     cell.pushingTo.b = true;
     cell.pushingTo.l = true;
+  } else if (cell.kind === "Clock") {
+    cell.pushingTo.t = clockIsOn;
+    cell.pushingTo.r = clockIsOn;
+    cell.pushingTo.b = clockIsOn;
+    cell.pushingTo.l = clockIsOn;
   } else if (cell.kind === "None") {
     cell.pushingTo.t = false;
     cell.pushingTo.r = false;
@@ -161,10 +170,8 @@ function renderCell(imageData, x, y, cell) {
   imageData.data[4 * i + 3] = 255;
 }
 
-let c = 0;
-
 function update() {
-  //setTimeout(() => requestAnimationFrame(update), 100);
+  //setTimeout(() => requestAnimationFrame(update), 500);
   requestAnimationFrame(update);
   if (!circuitData) {
     return;
@@ -179,6 +186,7 @@ function update() {
       const y = circuitData.positions[inputIdx][1];
       cells[y][x].kind = values[valueIndex][inputIdx] ? "Emitter" : "Transmitter";
     }
+    clockIsOn = (frameIndex % cycleCount) / cycleCount < 0.5;
     frameIndex++;
   }
   prevCells = JSON.parse(JSON.stringify(cells));
