@@ -22,11 +22,12 @@ function makeCell(kind, pushingTo) {
 }
 
 async function loadCircuit(filename) {
-  const res = await fetch("circuits/" + filename);
+  const res = await fetch("circuits/" + filename, { cache: "no-store" });
   circuitData = await res.json();
   const strs = circuitData.dataStrs;
   height = strs.length;
   width = strs[0].length;
+  cells = [];
   for (let y = 0; y < height; ++y) {
     cells.push([]);
     const str = strs[y];
@@ -36,16 +37,20 @@ async function loadCircuit(filename) {
       );
       if (str[x] === "E") {
         cells[y][x].kind = "Emitter";
-      } else if (str[x] === "L") {
+      } else if (str[x] === "C") {
         cells[y][x].kind = "Clock";
       } else if (str[x] === "#") {
         cells[y][x].kind = "Transmitter";
       } else if (str[x] === "+") {
         cells[y][x].kind = "Bridge";
-      } else if (str[x] === "C") {
-        cells[y][x].kind = "Conflictor";
-      } else if (str[x] === "I") {
-        cells[y][x].kind = "Inductor";
+      } else if (str[x] === "N") {
+        cells[y][x].kind = "Not";
+      } else if (str[x] === "A") {
+        cells[y][x].kind = "And";
+      } else if (str[x] === "O") {
+        cells[y][x].kind = "Or";
+      } else if (str[x] === "X") {
+        cells[y][x].kind = "Xor";
       } else {
         cells[y][x].kind = "None";
       }
@@ -125,7 +130,7 @@ function updateCell(x, y, cell, pushedFrom) {
     cell.pushingTo.r = isAnyPushed && !pushedFrom.r;
     cell.pushingTo.b = isAnyPushed && !pushedFrom.b;
     cell.pushingTo.l = isAnyPushed && !pushedFrom.l;
-  } else if (cell.kind === "Conflictor") {
+  } else if (cell.kind === "Not") {
     const isPushedV = pushedFrom.t || pushedFrom.b;
     const isPushedH = pushedFrom.r || pushedFrom.l;
     const isEitherPushed = isPushedV && !isPushedH || !isPushedV && isPushedH;
@@ -133,14 +138,13 @@ function updateCell(x, y, cell, pushedFrom) {
     cell.pushingTo.r = isEitherPushed && isPushedH && !pushedFrom.r;
     cell.pushingTo.b = isEitherPushed && isPushedV && !pushedFrom.b;
     cell.pushingTo.l = isEitherPushed && isPushedH && !pushedFrom.l;
-  } else if (cell.kind === "Inductor") {
-    const isPushedV = pushedFrom.t || pushedFrom.b;
-    const isPushedH = pushedFrom.r || pushedFrom.l;
-    const isBothPushed = isPushedV && isPushedH;
-    cell.pushingTo.t = isBothPushed && isPushedV && !pushedFrom.t;
-    cell.pushingTo.r = isBothPushed && isPushedH && !pushedFrom.r;
-    cell.pushingTo.b = isBothPushed && isPushedV && !pushedFrom.b;
-    cell.pushingTo.l = isBothPushed && isPushedH && !pushedFrom.l;
+  } else if (cell.kind === "And") {
+    const signalCount = pushedFrom.t + pushedFrom.r + pushedFrom.b + pushedFrom.l;
+    const signalCountGe2 = signalCount >= 2;
+    cell.pushingTo.t = signalCountGe2 && !pushedFrom.t;
+    cell.pushingTo.r = signalCountGe2 && !pushedFrom.r;
+    cell.pushingTo.b = signalCountGe2 && !pushedFrom.b;
+    cell.pushingTo.l = signalCountGe2 && !pushedFrom.l;
   } else if (cell.kind === "Bridge") {
     const isPushedV = pushedFrom.t || pushedFrom.b;
     const isPushedH = pushedFrom.r || pushedFrom.l;
@@ -148,6 +152,22 @@ function updateCell(x, y, cell, pushedFrom) {
     cell.pushingTo.r = isPushedH && !pushedFrom.r;
     cell.pushingTo.b = isPushedV && !pushedFrom.b;
     cell.pushingTo.l = isPushedH && !pushedFrom.l;
+  } else if (cell.kind === "Or") {
+    const isPushedV = pushedFrom.t || pushedFrom.b;
+    const isPushedH = pushedFrom.r || pushedFrom.l;
+    cell.pushingTo.t = isPushedH && !pushedFrom.t;
+    cell.pushingTo.r = isPushedV && !pushedFrom.r;
+    cell.pushingTo.b = isPushedH && !pushedFrom.b;
+    cell.pushingTo.l = isPushedV && !pushedFrom.l;
+  } else if (cell.kind === "Xor") {
+    const signalCountV = pushedFrom.t + pushedFrom.b;
+    const signalCountH = pushedFrom.r + pushedFrom.l;
+    const signalCountVEq1 = signalCountV == 1;
+    const signalCountHEq1 = signalCountH == 1;
+    cell.pushingTo.t = signalCountHEq1 && !pushedFrom.t;
+    cell.pushingTo.r = signalCountVEq1 && !pushedFrom.r;
+    cell.pushingTo.b = signalCountHEq1 && !pushedFrom.b;
+    cell.pushingTo.l = signalCountVEq1 && !pushedFrom.l;
   }
 }
 
@@ -156,11 +176,15 @@ function renderCell(imageData, x, y, cell) {
   if (cell.kind === "Transmitter") {
     colors = {r: {s: 0.5, e: 1}, g: {s: 0.5, e: 1}, b: {s: 0.5, e: 1}};
   } else if (cell.kind === "Bridge") {
-    colors = {r: {s: 0.25, e: 1}, g: {s: 0.25, e: 1}, b: {s: 0.75, e: 1}};
-  } else if (cell.kind === "Conflictor") {
+    colors = {r: {s: 0.75, e: 1}, g: {s: 0.75, e: 1}, b: {s: 0.75, e: 1}};
+  } else if (cell.kind === "Not") {
     colors = {r: {s: 0.75, e: 1}, g: {s: 0.25, e: 1}, b: {s: 0.25, e: 1}};
-  } else if (cell.kind === "Inductor") {
-    colors = {r: {s: 0.25, e: 1}, g: {s: 0.75, e: 1}, b: {s: 0.25, e: 1}};
+  } else if (cell.kind === "And") {
+    colors = {r: {s: 0.75, e: 1}, g: {s: 0.50, e: 1}, b: {s: 0.25, e: 1}};
+  } else if (cell.kind === "Or") {
+    colors = {r: {s: 0.25, e: 1}, g: {s: 0.50, e: 1}, b: {s: 0.50, e: 1}};
+  } else if (cell.kind === "Xor") {
+    colors = {r: {s: 0.25, e: 1}, g: {s: 0.25, e: 1}, b: {s: 0.75, e: 1}};
   }
   const intensity = (cell.pushingTo.t + cell.pushingTo.r + cell.pushingTo.b + cell.pushingTo.l) / 4;
   i = x + y * imageData.width;

@@ -1,0 +1,40 @@
+Template
+ ?   ↓   ?   ↓
+→O? →O? →O← →O←
+ ?   ?   ?   ?
+
+Transmit (And1)
+ ↑
+→O→
+ ↓
+
+And (And2)
+ .   ↓   ↑
+→O. →O→ →O←
+ .   ↓   ↓
+
+And3
+ .   ↓   .   ↓
+→O. →O. →O← →O←
+ .   .   .   ↓
+
+Not (Axis1)
+ .   ↓   ↓
+→O→ →O. →O←
+ .   .   .
+
+Bridge (Axis2)
+ .   ↓
+→O→ →O→
+ .   ↓
+
+Or
+ ↑   ↑ 
+→O. →O←
+ ↓   ↓ 
+
+Xor
+ ↑   . 
+→O. →O←
+ ↓   . 
+
