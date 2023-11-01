@@ -180,11 +180,11 @@ function renderCell(imageData, x, y, cell) {
   } else if (cell.kind === "Not") {
     colors = {r: {s: 0.75, e: 1}, g: {s: 0.25, e: 1}, b: {s: 0.25, e: 1}};
   } else if (cell.kind === "And") {
-    colors = {r: {s: 0.75, e: 1}, g: {s: 0.50, e: 1}, b: {s: 0.25, e: 1}};
+    colors = {r: {s: 0.25, e: 1}, g: {s: 0.75, e: 1}, b: {s: 0.25, e: 1}};
   } else if (cell.kind === "Or") {
-    colors = {r: {s: 0.25, e: 1}, g: {s: 0.50, e: 1}, b: {s: 0.50, e: 1}};
-  } else if (cell.kind === "Xor") {
     colors = {r: {s: 0.25, e: 1}, g: {s: 0.25, e: 1}, b: {s: 0.75, e: 1}};
+  } else if (cell.kind === "Xor") {
+    colors = {r: {s: 0.75, e: 1}, g: {s: 0.25, e: 1}, b: {s: 0.75, e: 1}};
   }
   const intensity = (cell.pushingTo.t + cell.pushingTo.r + cell.pushingTo.b + cell.pushingTo.l) / 4;
   i = x + y * imageData.width;
