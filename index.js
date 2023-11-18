@@ -3,10 +3,12 @@ const circuitFilenames = [
   "clock.json",
   "half_adder.json",
   "full_adder.json",
+  "4_bit_adder.json",
   "latch.json",
   "gated_d_latch.json",
   "edge_triggered_d_flip_flop.json",
-  "2_bit_decoder.json"
+  "2_bit_decoder.json",
+  "delay.json"
 ];
 let width;
 let height;
