@@ -1,13 +1,11 @@
 const circuitFilenames = [
-  "not.json",
-  "and.json",
-  "or.json",
-  "nor.json",
-  "xor.json",
+  "logic_gates.json",
+  "clock.json",
   "half_adder.json",
   "full_adder.json",
   "latch.json",
-  "delay.json",
+  "gated_d_latch.json",
+  "edge_triggered_d_flip_flop.json",
   "2_bit_decoder.json"
 ];
 let width;
@@ -19,6 +17,21 @@ let clockIsOn = false;
 
 function makeCell(kind, pushingTo) {
   return { kind, pushingTo };
+}
+
+function cellIsComponent(cell) {
+  return (
+    cell.kind === "And" ||
+    cell.kind === "Or" ||
+    cell.kind === "Xor"
+  );
+}
+
+function cellIsOut(cell) {
+  return (
+    cell.kind === "Out" ||
+    cell.kind === "NotOut"
+  );
 }
 
 async function loadCircuit(filename) {
@@ -35,22 +48,30 @@ async function loadCircuit(filename) {
       cells[y].push(
         makeCell("None", { t: false, r: false, b: false, l: false })
       );
-      if (str[x] === "E") {
-        cells[y][x].kind = "Emitter";
-      } else if (str[x] === "C") {
-        cells[y][x].kind = "Clock";
-      } else if (str[x] === "#") {
-        cells[y][x].kind = "Transmitter";
+      // 1 One
+      // . Wire
+      // + Cross
+      // A AND
+      // O OR
+      // X XOR
+      // * Out
+      // ! NOT-Out
+      if (str[x] === "1") {
+        cells[y][x].kind = "One";
+      } else if (str[x] === ".") {
+        cells[y][x].kind = "Wire";
       } else if (str[x] === "+") {
-        cells[y][x].kind = "Bridge";
-      } else if (str[x] === "N") {
-        cells[y][x].kind = "Not";
+        cells[y][x].kind = "Cross";
       } else if (str[x] === "A") {
         cells[y][x].kind = "And";
       } else if (str[x] === "O") {
         cells[y][x].kind = "Or";
       } else if (str[x] === "X") {
         cells[y][x].kind = "Xor";
+      } else if (str[x] === "*") {
+        cells[y][x].kind = "Out";
+      } else if (str[x] === "!") {
+        cells[y][x].kind = "NotOut";
       } else {
         cells[y][x].kind = "None";
       }
@@ -108,89 +129,101 @@ onload = async () => {
   requestAnimationFrame(update);
 };
 
-function updateCell(x, y, cell, pushedFrom) {
-  if (cell.kind === "Emitter") {
+function updateCell(x, y, cell, roundingCells) {
+  const pushedFrom = {
+    t: roundingCells.t.pushingTo.b,
+    r: roundingCells.r.pushingTo.l,
+    b: roundingCells.b.pushingTo.t,
+    l: roundingCells.l.pushingTo.r,
+  };
+  if (cell.kind === "One") {
     cell.pushingTo.t = true;
     cell.pushingTo.r = true;
     cell.pushingTo.b = true;
     cell.pushingTo.l = true;
-  } else if (cell.kind === "Clock") {
-    cell.pushingTo.t = clockIsOn;
-    cell.pushingTo.r = clockIsOn;
-    cell.pushingTo.b = clockIsOn;
-    cell.pushingTo.l = clockIsOn;
-  } else if (cell.kind === "None") {
-    cell.pushingTo.t = false;
-    cell.pushingTo.r = false;
-    cell.pushingTo.b = false;
-    cell.pushingTo.l = false;
-  } else if (cell.kind === "Transmitter") {
+  } else if (cell.kind === "Wire") {
     const isAnyPushed = pushedFrom.t || pushedFrom.r || pushedFrom.b || pushedFrom.l;
     cell.pushingTo.t = isAnyPushed && !pushedFrom.t;
     cell.pushingTo.r = isAnyPushed && !pushedFrom.r;
     cell.pushingTo.b = isAnyPushed && !pushedFrom.b;
     cell.pushingTo.l = isAnyPushed && !pushedFrom.l;
-  } else if (cell.kind === "Not") {
-    const isPushedV = pushedFrom.t || pushedFrom.b;
-    const isPushedH = pushedFrom.r || pushedFrom.l;
-    const isEitherPushed = isPushedV && !isPushedH || !isPushedV && isPushedH;
-    cell.pushingTo.t = isEitherPushed && isPushedV && !pushedFrom.t;
-    cell.pushingTo.r = isEitherPushed && isPushedH && !pushedFrom.r;
-    cell.pushingTo.b = isEitherPushed && isPushedV && !pushedFrom.b;
-    cell.pushingTo.l = isEitherPushed && isPushedH && !pushedFrom.l;
-  } else if (cell.kind === "And") {
-    const signalCount = pushedFrom.t + pushedFrom.r + pushedFrom.b + pushedFrom.l;
-    const signalCountGe2 = signalCount >= 2;
-    cell.pushingTo.t = signalCountGe2 && !pushedFrom.t;
-    cell.pushingTo.r = signalCountGe2 && !pushedFrom.r;
-    cell.pushingTo.b = signalCountGe2 && !pushedFrom.b;
-    cell.pushingTo.l = signalCountGe2 && !pushedFrom.l;
-  } else if (cell.kind === "Bridge") {
+  } else if (cell.kind === "Cross") {
     const isPushedV = pushedFrom.t || pushedFrom.b;
     const isPushedH = pushedFrom.r || pushedFrom.l;
     cell.pushingTo.t = isPushedV && !pushedFrom.t;
     cell.pushingTo.r = isPushedH && !pushedFrom.r;
     cell.pushingTo.b = isPushedV && !pushedFrom.b;
     cell.pushingTo.l = isPushedH && !pushedFrom.l;
+  } else if (cell.kind === "And") {
+    const signal = (
+      (roundingCells.t.kind === "Wire" ? pushedFrom.t : true) &&
+      (roundingCells.r.kind === "Wire" ? pushedFrom.r : true) &&
+      (roundingCells.b.kind === "Wire" ? pushedFrom.b : true) &&
+      (roundingCells.l.kind === "Wire" ? pushedFrom.l : true)
+    );
+    cell.pushingTo.t = signal && cellIsOut(roundingCells.t);
+    cell.pushingTo.r = signal && cellIsOut(roundingCells.r);
+    cell.pushingTo.b = signal && cellIsOut(roundingCells.b);
+    cell.pushingTo.l = signal && cellIsOut(roundingCells.l);
   } else if (cell.kind === "Or") {
-    const isPushedV = pushedFrom.t || pushedFrom.b;
-    const isPushedH = pushedFrom.r || pushedFrom.l;
-    cell.pushingTo.t = isPushedH && !pushedFrom.t;
-    cell.pushingTo.r = isPushedV && !pushedFrom.r;
-    cell.pushingTo.b = isPushedH && !pushedFrom.b;
-    cell.pushingTo.l = isPushedV && !pushedFrom.l;
+    const signal = (
+      (roundingCells.t.kind === "Wire" && pushedFrom.t) ||
+      (roundingCells.r.kind === "Wire" && pushedFrom.r) ||
+      (roundingCells.b.kind === "Wire" && pushedFrom.b) ||
+      (roundingCells.l.kind === "Wire" && pushedFrom.l)
+    );
+    cell.pushingTo.t = signal && cellIsOut(roundingCells.t);
+    cell.pushingTo.r = signal && cellIsOut(roundingCells.r);
+    cell.pushingTo.b = signal && cellIsOut(roundingCells.b);
+    cell.pushingTo.l = signal && cellIsOut(roundingCells.l);
   } else if (cell.kind === "Xor") {
-    const signalCountV = pushedFrom.t + pushedFrom.b;
-    const signalCountH = pushedFrom.r + pushedFrom.l;
-    const signalCountVEq1 = signalCountV == 1;
-    const signalCountHEq1 = signalCountH == 1;
-    cell.pushingTo.t = signalCountHEq1 && !pushedFrom.t;
-    cell.pushingTo.r = signalCountVEq1 && !pushedFrom.r;
-    cell.pushingTo.b = signalCountHEq1 && !pushedFrom.b;
-    cell.pushingTo.l = signalCountVEq1 && !pushedFrom.l;
+    const signal = (
+      (roundingCells.t.kind === "Wire" && pushedFrom.t) +
+      (roundingCells.r.kind === "Wire" && pushedFrom.r) +
+      (roundingCells.b.kind === "Wire" && pushedFrom.b) +
+      (roundingCells.l.kind === "Wire" && pushedFrom.l)
+    ) % 2 === 1;
+    cell.pushingTo.t = signal && cellIsOut(roundingCells.t);
+    cell.pushingTo.r = signal && cellIsOut(roundingCells.r);
+    cell.pushingTo.b = signal && cellIsOut(roundingCells.b);
+    cell.pushingTo.l = signal && cellIsOut(roundingCells.l);
+  } else if (cell.kind === "Out" || cell.kind === "NotOut") {
+    const isSignaled = pushedFrom.t || pushedFrom.r || pushedFrom.b || pushedFrom.l;
+    const signal = (cell.kind === "NotOut") ? !isSignaled : isSignaled;
+    cell.pushingTo.t = signal && roundingCells.t.kind === "Wire";
+    cell.pushingTo.r = signal && roundingCells.r.kind === "Wire";
+    cell.pushingTo.b = signal && roundingCells.b.kind === "Wire";
+    cell.pushingTo.l = signal && roundingCells.l.kind === "Wire";
+  } else {
+    cell.pushingTo.t = false;
+    cell.pushingTo.r = false;
+    cell.pushingTo.b = false;
+    cell.pushingTo.l = false;
   }
 }
 
 function renderCell(imageData, x, y, cell) {
-  let colors = {r: {s: 0, e: 1}, g: {s: 0, e: 1}, b: {s: 0, e: 1}};
-  if (cell.kind === "Transmitter") {
-    colors = {r: {s: 0.5, e: 1}, g: {s: 0.5, e: 1}, b: {s: 0.5, e: 1}};
-  } else if (cell.kind === "Bridge") {
-    colors = {r: {s: 0.75, e: 1}, g: {s: 0.75, e: 1}, b: {s: 0.75, e: 1}};
-  } else if (cell.kind === "Not") {
-    colors = {r: {s: 0.75, e: 1}, g: {s: 0.25, e: 1}, b: {s: 0.25, e: 1}};
+  let colors = [[0, 0, 0], [1, 1, 1]];
+  if (cell.kind === "Wire") {
+    colors = [[0.5, 0.5, 0.5], [1, 1, 1]];
+  } else if (cell.kind === "Cross") {
+    colors = [[0.25, 0.5, 0.25], [1, 1, 1]];
   } else if (cell.kind === "And") {
-    colors = {r: {s: 0.25, e: 1}, g: {s: 0.75, e: 1}, b: {s: 0.25, e: 1}};
+    colors = [[0.75, 0.75, 0], [1, 1, 1]];
   } else if (cell.kind === "Or") {
-    colors = {r: {s: 0.25, e: 1}, g: {s: 0.25, e: 1}, b: {s: 0.75, e: 1}};
+    colors = [[0.25, 0.75, 0.75], [1, 1, 1]];
   } else if (cell.kind === "Xor") {
-    colors = {r: {s: 0.75, e: 1}, g: {s: 0.25, e: 1}, b: {s: 0.75, e: 1}};
+    colors = [[0.5, 0.25, 0.5], [1, 1, 1]];
+  } else if (cell.kind === "Out") {
+    colors = [[0.25, 0.25, 1], [1, 1, 1]];
+  } else if (cell.kind === "NotOut") {
+    colors = [[0.75, 0.5, 0.5], [1, 1, 1]];
   }
   const intensity = (cell.pushingTo.t + cell.pushingTo.r + cell.pushingTo.b + cell.pushingTo.l) / 4;
   i = x + y * imageData.width;
-  imageData.data[4 * i + 0] = 255 * (colors.r.s + (colors.r.e - colors.r.s) * intensity);
-  imageData.data[4 * i + 1] = 255 * (colors.g.s + (colors.g.e - colors.g.s) * intensity);
-  imageData.data[4 * i + 2] = 255 * (colors.b.s + (colors.b.e - colors.b.s) * intensity);
+  imageData.data[4 * i + 0] = 255 * (colors[0][0] + (colors[1][0] - colors[0][0]) * intensity);
+  imageData.data[4 * i + 1] = 255 * (colors[0][1] + (colors[1][1] - colors[0][1]) * intensity);
+  imageData.data[4 * i + 2] = 255 * (colors[0][2] + (colors[1][2] - colors[0][2]) * intensity);
   imageData.data[4 * i + 3] = 255;
 }
 
@@ -208,7 +241,7 @@ function update() {
     for (let inputIdx = 0; inputIdx < inputCount; ++inputIdx) {
       const x = circuitData.positions[inputIdx][0];
       const y = circuitData.positions[inputIdx][1];
-      cells[y][x].kind = values[valueIndex][inputIdx] ? "Emitter" : "Transmitter";
+      cells[y][x].kind = values[valueIndex][inputIdx] ? "One" : "Wire";
     }
     clockIsOn = (frameIndex % cycleCount) / cycleCount < 0.5;
     frameIndex++;
@@ -216,16 +249,13 @@ function update() {
   prevCells = JSON.parse(JSON.stringify(cells));
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      updateCell(
-        x, y,
-        cells[y][x],
-        {
-          t: (1 <= y && prevCells[y - 1][x])?.pushingTo?.b,
-          r: (x < (width - 1) && prevCells[y][x + 1])?.pushingTo?.l,
-          b: (y < (height - 1) && prevCells[y + 1][x])?.pushingTo?.t,
-          l: (1 <= x && prevCells[y][x - 1])?.pushingTo?.r,
-        }
-      );
+      const roundingCells = {
+        t: prevCells[(y + height - 1) % height][x],
+        r: prevCells[y][(x + 1) % width],
+        b: prevCells[(y + 1) % height][x],
+        l: prevCells[y][(x + width - 1) % width]
+      };
+      updateCell(x, y, cells[y][x], roundingCells);
     }
   }
   const canvas = document.querySelector("canvas");
