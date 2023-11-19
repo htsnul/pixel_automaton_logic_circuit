@@ -7,8 +7,10 @@ const circuitFilenames = [
   "latch.json",
   "gated_d_latch.json",
   "edge_triggered_d_flip_flop.json",
+  "4_to_1_multiplexer.json",
   "2_bit_decoder.json",
-  "delay.json"
+  "delay.json",
+  "7_segment_display.json"
 ];
 let width;
 let height;
