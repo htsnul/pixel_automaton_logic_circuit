@@ -8,6 +8,8 @@ const circuitFilenames = [
   "gated_d_latch.json",
   "edge_triggered_d_flip_flop.json",
   "4_to_1_multiplexer.json",
+  "rom.json",
+  "ram.json",
   "2_bit_decoder.json",
   "delay.json",
   "7_segment_display.json"
@@ -192,7 +194,12 @@ function updateCell(x, y, cell, roundingCells) {
     cell.pushingTo.b = signal && cellIsOut(roundingCells.b);
     cell.pushingTo.l = signal && cellIsOut(roundingCells.l);
   } else if (cell.kind === "Out" || cell.kind === "NotOut") {
-    const isSignaled = pushedFrom.t || pushedFrom.r || pushedFrom.b || pushedFrom.l;
+    const isSignaled = (
+      (cellIsComponent(roundingCells.t) && pushedFrom.t) ||
+      (cellIsComponent(roundingCells.r) && pushedFrom.r) ||
+      (cellIsComponent(roundingCells.b) && pushedFrom.b) ||
+      (cellIsComponent(roundingCells.l) && pushedFrom.l)
+    );
     const signal = (cell.kind === "NotOut") ? !isSignaled : isSignaled;
     cell.pushingTo.t = signal && roundingCells.t.kind === "Wire";
     cell.pushingTo.r = signal && roundingCells.r.kind === "Wire";
