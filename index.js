@@ -1,5 +1,6 @@
 const circuitFilenames = [
   "logic_gates.json",
+  "0_1_hold.json",
   "clock.json",
   "half_adder.json",
   "full_adder.json",
