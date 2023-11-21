@@ -9,9 +9,10 @@ const circuitFilenames = [
   "gated_d_latch.json",
   "edge_triggered_d_flip_flop.json",
   "4_to_1_multiplexer.json",
+  "2_bit_decoder.json",
   "rom.json",
   "ram.json",
-  "2_bit_decoder.json",
+  "ripple_counter.json",
   "delay.json",
   "7_segment_display.json"
 ];
@@ -245,29 +246,31 @@ function update() {
   if (!circuitData) {
     return;
   }
-  {
-    const cycleCount = circuitData.cycleCount;
-    const inputCount = circuitData.inputCount;
-    const values = circuitData.values;
-    const valueIndex = Math.floor(frameIndex / cycleCount) % values.length;
-    for (let inputIdx = 0; inputIdx < inputCount; ++inputIdx) {
-      const x = circuitData.positions[inputIdx][0];
-      const y = circuitData.positions[inputIdx][1];
-      cells[y][x].kind = values[valueIndex][inputIdx] ? "One" : "Wire";
+  for (let i = 0; i < 1; ++i) {
+    {
+      const cycleCount = circuitData.cycleCount;
+      const inputCount = circuitData.inputCount;
+      const values = circuitData.values;
+      const valueIndex = Math.floor(frameIndex / cycleCount) % values.length;
+      for (let inputIdx = 0; inputIdx < inputCount; ++inputIdx) {
+        const x = circuitData.positions[inputIdx][0];
+        const y = circuitData.positions[inputIdx][1];
+        cells[y][x].kind = values[valueIndex][inputIdx] ? "One" : "Wire";
+      }
+      clockIsOn = (frameIndex % cycleCount) / cycleCount < 0.5;
+      frameIndex++;
     }
-    clockIsOn = (frameIndex % cycleCount) / cycleCount < 0.5;
-    frameIndex++;
-  }
-  prevCells = JSON.parse(JSON.stringify(cells));
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const roundingCells = {
-        t: prevCells[(y + height - 1) % height][x],
-        r: prevCells[y][(x + 1) % width],
-        b: prevCells[(y + 1) % height][x],
-        l: prevCells[y][(x + width - 1) % width]
-      };
-      updateCell(x, y, cells[y][x], roundingCells);
+    prevCells = JSON.parse(JSON.stringify(cells));
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const roundingCells = {
+          t: prevCells[(y + height - 1) % height][x],
+          r: prevCells[y][(x + 1) % width],
+          b: prevCells[(y + 1) % height][x],
+          l: prevCells[y][(x + width - 1) % width]
+        };
+        updateCell(x, y, cells[y][x], roundingCells);
+      }
     }
   }
   const canvas = document.querySelector("canvas");
