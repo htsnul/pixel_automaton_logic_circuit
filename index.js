@@ -113,7 +113,7 @@ async function loadCircuit(filename) {
 
 function initGl() {
   const canvas = document.querySelector("canvas");
-  gl = canvas.getContext("webgl");
+  gl = canvas.getContext("webgl2");
   programForUpdate = (() => {
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
     gl.shaderSource(vertexShader, `
@@ -135,42 +135,40 @@ function initGl() {
         float x = gl_FragCoord.x;
         float y = gl_FragCoord.y;
         vec4 c = texture2D(uSampler, vec2(x / 256.0, y / 256.0));
-        int kind = int(256.0 * c[0] / 64.0 + 0.5);
+        int kind = int(256.0 * c[0] / 64.0);
         // None
         if (kind == 0) {
-          c[2] = 0.0;
-          c[3] = 0.0;
           gl_FragColor = c;
           return;
         }
-        int subKind = int(256.0 * c[1] / 64.0 + 0.5);
+        // t r b l
+        int subKind = int(mod(256.0 * c[0] / 16.0, 4.0));
         vec4 tc = texture2D(uSampler, vec2((x + 0.0) / 256.0, (y + 1.0) / 256.0));
-        int tKind = int(256.0 * tc[0] / 64.0 + 0.5);
-        int tSubKind = int(256.0 * tc[1] / 64.0 + 0.5);
-        bool tsb = bool(mod(floor(256.0 * tc[3] + 0.5), 16.0));
+        int tKind = int(256.0 * tc[0] / 64.0);
+        int tSubKind = int(mod(256.0 * tc[0] / 16.0, 4.0));
+        bool tsb = bool(floor(mod(256.0 * tc[0] / 2.0, 2.0)));
         vec4 bc = texture2D(uSampler, vec2((x + 0.0) / 256.0, (y - 1.0) / 256.0));
-        int bKind = int(256.0 * bc[0] / 64.0 + 0.5);
-        int bSubKind = int(256.0 * bc[1] / 64.0 + 0.5);
-        bool bst = bool(floor(256.0 * bc[3] / 16.0 + 0.5));
+        int bKind = int(256.0 * bc[0] / 64.0);
+        int bSubKind = int(mod(256.0 * bc[0] / 16.0, 4.0));
+        bool bst = bool(floor(mod(256.0 * bc[0] / 8.0, 2.0)));
         vec4 rc = texture2D(uSampler, vec2((x + 1.0) / 256.0, (y + 0.0) / 256.0));
-        int rKind = int(256.0 * rc[0] / 64.0 + 0.5);
-        int rSubKind = int(256.0 * rc[1] / 64.0 + 0.5);
-        bool rsl = bool(floor(256.0 * rc[2] / 16.0 + 0.5));
+        int rKind = int(256.0 * rc[0] / 64.0);
+        int rSubKind = int(mod(256.0 * rc[0] / 16.0, 4.0));
+        bool rsl = bool(floor(mod(256.0 * rc[0], 2.0)));
         vec4 lc = texture2D(uSampler, vec2((x - 1.0) / 256.0, (y + 0.0) / 256.0));
-        int lKind = int(256.0 * lc[0] / 64.0 + 0.5);
-        int lSubKind = int(256.0 * lc[1] / 64.0 + 0.5);
-        bool lsr = bool(mod(floor(256.0 * lc[2] + 0.5), 16.0));
+        int lKind = int(256.0 * lc[0] / 64.0);
+        int lSubKind = int(mod(256.0 * lc[0] / 16.0, 4.0));
+        bool lsr = bool(floor(mod(256.0 * lc[0] / 4.0, 2.0)));
         // Wire
         if (kind == 1 && subKind == 0) {
           bool signal = tsb || bst || rsl || lsr;
-          c[2] = (
-            ((signal && !lsr) ? 16.0 : 0.0) +
-            ((signal && !rsl) ? 1.0 : 0.0)
-          ) / 256.0;
-          c[3] = (
-            ((signal && !tsb) ? 16.0 : 0.0) +
-            ((signal && !bst) ? 1.0 : 0.0)
-          ) / 256.0;
+          c[0] = (float(
+            kind * 64 + subKind * 16 +
+            ((signal && !tsb) ? 8 : 0) +
+            ((signal && !rsl) ? 4 : 0) +
+            ((signal && !bst) ? 2 : 0) +
+            ((signal && !lsr) ? 1 : 0)
+          ) + 0.5) / 256.0;
           gl_FragColor = c;
           return;
         }
@@ -178,21 +176,22 @@ function initGl() {
         if (kind == 1 && subKind == 1) {
           bool signalV = tsb || bst;
           bool signalH = rsl || lsr;
-          c[2] = (
-            ((signalH && !lsr) ? 16.0 : 0.0) +
-            ((signalH && !rsl) ? 1.0 : 0.0)
-          ) / 256.0;
-          c[3] = (
-            ((signalV && !tsb) ? 16.0 : 0.0) +
-            ((signalV && !bst) ? 1.0 : 0.0)
-          ) / 256.0;
+          c[0] = (float(
+            kind * 64 + subKind * 16 +
+            ((signalV && !tsb) ? 8 : 0) +
+            ((signalH && !rsl) ? 4 : 0) +
+            ((signalV && !bst) ? 2 : 0) +
+            ((signalH && !lsr) ? 1 : 0)
+          ) + 0.5) / 256.0;
           gl_FragColor = c;
           return;
         }
         // One
         if (kind == 1 && subKind == 2) {
-          c[2] = (16.0 + 1.0) / 256.0;
-          c[3] = (16.0 + 1.0) / 256.0;
+          c[0] = (float(
+            kind * 64 + subKind * 16 +
+            8 + 4 + 2 + 1
+          ) + 0.5) / 256.0;
           gl_FragColor = c;
           return;
         }
@@ -231,14 +230,13 @@ function initGl() {
               ) == 1.0
             );
           }
-          c[2] = (
-            ((signal && lKind == 3) ? 16.0 : 0.0) +
-            ((signal && rKind == 3) ? 1.0 : 0.0)
-          ) / 256.0;
-          c[3] = (
-            ((signal && tKind == 3) ? 16.0 : 0.0) +
-            ((signal && bKind == 3) ? 1.0 : 0.0)
-          ) / 256.0;
+          c[0] = (float(
+            kind * 64 + subKind * 16 +
+            ((signal && tKind == 3) ? 8 : 0) +
+            ((signal && rKind == 3) ? 4 : 0) +
+            ((signal && bKind == 3) ? 2 : 0) +
+            ((signal && lKind == 3) ? 1 : 0)
+          ) + 0.5) / 256.0;
           gl_FragColor = c;
           return;
         }
@@ -251,18 +249,17 @@ function initGl() {
             (lKind == 2 && lsr)
           );
           bool signal = (subKind == 1) ? !isSignaled : isSignaled;
-          c[2] = (
-            ((signal && lKind == 1) ? 16.0 : 0.0) +
-            ((signal && rKind == 1) ? 1.0 : 0.0)
-          ) / 256.0;
-          c[3] = (
-            ((signal && tKind == 1) ? 16.0 : 0.0) +
-            ((signal && bKind == 1) ? 1.0 : 0.0)
-          ) / 256.0;
+          c[0] = (float(
+            kind * 64 + subKind * 16 +
+            ((signal && tKind == 1) ? 8 : 0) +
+            ((signal && rKind == 1) ? 4 : 0) +
+            ((signal && bKind == 1) ? 2 : 0) +
+            ((signal && lKind == 1) ? 1 : 0)
+          ) + 0.5) / 256.0;
           gl_FragColor = c;
           return;
         }
-        gl_FragColor = c;
+        //gl_FragColor = c;
       }
     `);
     gl.compileShader(fragmentShader);
@@ -303,17 +300,57 @@ function initGl() {
       void main() {
         vec4 c = vec4(0, 0, 0, 1);
         vec4 sc = texture2D(uSampler, vec2(gl_FragCoord.x / 256.0, gl_FragCoord.y / 256.0));
-        int kind = int(256.0 * sc[0] / 64.0 + 0.5);
+        int kind = int(256.0 * sc[0] / 64.0);
         // None
         if (kind == 0) {
           gl_FragColor = c;
           return;
         }
-        int subKind = int(256.0 * sc[1] / 64.0 + 0.5);
-        bool st = bool(floor(256.0 * sc[2] / 16.0 + 0.5));
-        bool sb = bool(mod(floor(256.0 * sc[2] + 0.5), 16.0));
-        bool sr = bool(floor(256.0 * sc[3] / 16.0 + 0.5));
-        bool sl = bool(mod(floor(256.0 * sc[3] + 0.5), 16.0));
+        int subKind = int(mod(256.0 * sc[0] / 16.0, 4.0));
+        bool st = bool(floor(mod(256.0 * sc[0] / 8.0, 2.0)));
+        bool sr = bool(floor(mod(256.0 * sc[0] / 4.0, 2.0)));
+        bool sb = bool(floor(mod(256.0 * sc[0] / 2.0, 2.0)));
+        bool sl = bool(floor(mod(256.0 * sc[0], 2.0)));
+        // And
+        if (kind == 2 && subKind == 0) {
+          c[0] = 1.0;
+          c[1] = 0.9;
+          c[2] = 0.5;
+          gl_FragColor = c;
+          return;
+        }
+        // Or
+        if (kind == 2 && subKind == 1) {
+          c[0] = 0.25;
+          c[1] = 1.0;
+          c[2] = 0.25;
+          gl_FragColor = c;
+          return;
+        }
+        // Xor
+        if (kind == 2 && subKind == 2) {
+          c[0] = 1.0;
+          c[1] = 0.0;
+          c[2] = 1.0;
+          gl_FragColor = c;
+          return;
+        }
+        // Out
+        if (kind == 3 && subKind == 0) {
+          c[0] = 0.2;
+          c[1] = 0.2;
+          c[2] = 1.0;
+          gl_FragColor = c;
+          return;
+        }
+        // Not
+        if (kind == 3 && subKind == 1) {
+          c[0] = 1.0;
+          c[1] = 0.5;
+          c[2] = 0.5;
+          gl_FragColor = c;
+          return;
+        }
         if (st || sb || sr || sl) {
           c[0] = 1.0;
           c[1] = 1.0;
@@ -329,9 +366,13 @@ function initGl() {
           gl_FragColor = c;
           return;
         }
+        gl_FragColor = c;
       }
     `);
     gl.compileShader(fragmentShader);
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+      alert(gl.getShaderInfoLog(fragmentShader));
+    }
     const program = gl.createProgram();
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
@@ -364,7 +405,7 @@ function initGl() {
     targetTextures[i] = gl.createTexture();
     {
       gl.bindTexture(gl.TEXTURE_2D, targetTextures[i]);
-      const pixels = new Uint8Array(width * height * 4);
+      const pixels = new Uint8Array(width * height);
       for (let y = 0; y < height; ++y) {
         for (let x = 0; x < width; ++x) {
           const cell = cells[y][x];
@@ -402,19 +443,16 @@ function initGl() {
             kind = 3;
             subKind = 1;
           }
-          pixels[((height - y - 1) * width + x) * 4 + 0] = kind * 64;
-          pixels[((height - y - 1) * width + x) * 4 + 1] = subKind * 64;
-          pixels[((height - y - 1) * width + x) * 4 + 2] = 0;
-          pixels[((height - y - 1) * width + x) * 4 + 3] = 0;
+          pixels[((height - y - 1) * width + x)] = (kind << 6) + (subKind << 4);
         }
       }
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
-        gl.RGBA,
+        gl.R8,
         width, height,
         0,
-        gl.RGBA,
+        gl.RED,
         gl.UNSIGNED_BYTE,
         pixels
       );
