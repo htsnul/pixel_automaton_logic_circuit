@@ -116,8 +116,7 @@ function initGl() {
   gl = canvas.getContext("webgl2");
   programForUpdate = (() => {
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, `
-      #version 100
+    gl.shaderSource(vertexShader, `#version 300 es
       void main() {
         gl_Position = vec4(0.0, 0.0, 0.0, 1);
         gl_PointSize = 512.0;
@@ -125,141 +124,161 @@ function initGl() {
     `);
     gl.compileShader(vertexShader);
     const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, `
-      #version 100
+    gl.shaderSource(fragmentShader, `#version 300 es
       precision mediump float;
 
       uniform sampler2D uSampler;
+      out vec4 fragColor;
+
+      const int KindNone = 0;
+      const int KindWire = 1;
+      const int KindComponent = 2;
+      const int KindOut = 3;
+      const int WireSubKindWire = 0;
+      const int WireSubKindCross = 1;
+      const int WireSubKindOne = 2;
+      const int ComponentSubKindAnd = 0;
+      const int ComponentSubKindOr = 1;
+      const int ComponentSubKindXor = 2;
+      const int OutSubKindOut = 0;
+      const int OutSubKindInvOut = 1;
+
+      int cellValueFromColorComponent(float col) { return int(255.0 * col + 0.5); }
+      float cellValueToColorComponent(int val) { return float(val) / 255.0; }
+
+      int getCellKind(int val) { return val / 64; }
+      int getCellSubKind(int val) { return val / 16 % 4; }
+      bool getCellSignalT(int val) { return bool(val / 8 % 2); }
+      bool getCellSignalR(int val) { return bool(val / 4 % 2); }
+      bool getCellSignalB(int val) { return bool(val / 2 % 2); }
+      bool getCellSignalL(int val) { return bool(val % 2); }
+
+      int makeCellValue(
+        int kind, int subKind,
+        bool signalT, bool signalR, bool signalB, bool signalL
+      ) {
+        return (
+          kind * 64 +
+          subKind * 16 +
+          (signalT ? 8 : 0) +
+          (signalR ? 4 : 0) +
+          (signalB ? 2 : 0) +
+          (signalL ? 1 : 0)
+        );
+      }
 
       void main() {
-        float x = gl_FragCoord.x;
-        float y = gl_FragCoord.y;
-        vec4 c = texture2D(uSampler, vec2(x / 256.0, y / 256.0));
-        int kind = int(256.0 * c[0] / 64.0);
+        const float texW = 256.0f;
+        vec4 col = texture(uSampler, gl_FragCoord.xy / texW);
+        int cellVal = cellValueFromColorComponent(col[0]);
+        int kind = getCellKind(cellVal);
         // None
         if (kind == 0) {
-          gl_FragColor = c;
+          fragColor[0] = 0.0;
           return;
         }
-        // t r b l
-        int subKind = int(mod(256.0 * c[0] / 16.0, 4.0));
-        vec4 tc = texture2D(uSampler, vec2((x + 0.0) / 256.0, (y + 1.0) / 256.0));
-        int tKind = int(256.0 * tc[0] / 64.0);
-        int tSubKind = int(mod(256.0 * tc[0] / 16.0, 4.0));
-        bool tsb = bool(floor(mod(256.0 * tc[0] / 2.0, 2.0)));
-        vec4 bc = texture2D(uSampler, vec2((x + 0.0) / 256.0, (y - 1.0) / 256.0));
-        int bKind = int(256.0 * bc[0] / 64.0);
-        int bSubKind = int(mod(256.0 * bc[0] / 16.0, 4.0));
-        bool bst = bool(floor(mod(256.0 * bc[0] / 8.0, 2.0)));
-        vec4 rc = texture2D(uSampler, vec2((x + 1.0) / 256.0, (y + 0.0) / 256.0));
-        int rKind = int(256.0 * rc[0] / 64.0);
-        int rSubKind = int(mod(256.0 * rc[0] / 16.0, 4.0));
-        bool rsl = bool(floor(mod(256.0 * rc[0], 2.0)));
-        vec4 lc = texture2D(uSampler, vec2((x - 1.0) / 256.0, (y + 0.0) / 256.0));
-        int lKind = int(256.0 * lc[0] / 64.0);
-        int lSubKind = int(mod(256.0 * lc[0] / 16.0, 4.0));
-        bool lsr = bool(floor(mod(256.0 * lc[0] / 4.0, 2.0)));
-        // Wire
-        if (kind == 1 && subKind == 0) {
-          bool signal = tsb || bst || rsl || lsr;
-          c[0] = (float(
-            kind * 64 + subKind * 16 +
-            ((signal && !tsb) ? 8 : 0) +
-            ((signal && !rsl) ? 4 : 0) +
-            ((signal && !bst) ? 2 : 0) +
-            ((signal && !lsr) ? 1 : 0)
-          ) + 0.5) / 256.0;
-          gl_FragColor = c;
+        int subKind = getCellSubKind(cellVal);
+        vec4 colT = texture(uSampler, (gl_FragCoord.xy + vec2(+0.0, +1.0)) / texW);
+        vec4 colR = texture(uSampler, (gl_FragCoord.xy + vec2(+1.0, +0.0)) / texW);
+        vec4 colB = texture(uSampler, (gl_FragCoord.xy + vec2(+0.0, -1.0)) / texW);
+        vec4 colL = texture(uSampler, (gl_FragCoord.xy + vec2(-1.0, +0.0)) / texW);
+        int cellValT = cellValueFromColorComponent(colT[0]);
+        int cellValR = cellValueFromColorComponent(colR[0]);
+        int cellValB = cellValueFromColorComponent(colB[0]);
+        int cellValL = cellValueFromColorComponent(colL[0]);
+        int tKind = getCellKind(cellValT);
+        int tSubKind = getCellSubKind(cellValT);
+        bool tSignalB = getCellSignalB(cellValT);
+        int rKind = getCellKind(cellValR);
+        int rSubKind = getCellSubKind(cellValR);
+        bool rSignalL = getCellSignalL(cellValR);
+        int bKind = getCellKind(cellValB);
+        int bSubKind = getCellSubKind(cellValB);
+        bool bSignalT = getCellSignalT(cellValB);
+        int lKind = getCellKind(cellValL);
+        int lSubKind = getCellSubKind(cellValL);
+        bool lSignalR = getCellSignalR(cellValL);
+        if (kind == KindWire && subKind == WireSubKindWire) {
+          bool signaled = tSignalB || bSignalT || rSignalL || lSignalR;
+          fragColor[0] = cellValueToColorComponent(makeCellValue(
+            kind, subKind,
+            signaled && !tSignalB,
+            signaled && !rSignalL,
+            signaled && !bSignalT,
+            signaled && !lSignalR
+          ));
           return;
         }
-        // Cross
-        if (kind == 1 && subKind == 1) {
-          bool signalV = tsb || bst;
-          bool signalH = rsl || lsr;
-          c[0] = (float(
-            kind * 64 + subKind * 16 +
-            ((signalV && !tsb) ? 8 : 0) +
-            ((signalH && !rsl) ? 4 : 0) +
-            ((signalV && !bst) ? 2 : 0) +
-            ((signalH && !lsr) ? 1 : 0)
-          ) + 0.5) / 256.0;
-          gl_FragColor = c;
+        if (kind == KindWire && subKind == WireSubKindCross) {
+          bool signaledV = tSignalB || bSignalT;
+          bool signaledH = rSignalL || lSignalR;
+          fragColor[0] = cellValueToColorComponent(makeCellValue(
+            kind, subKind,
+            signaledV && !tSignalB,
+            signaledH && !rSignalL,
+            signaledV && !bSignalT,
+            signaledH && !lSignalR
+          ));
           return;
         }
-        // One
-        if (kind == 1 && subKind == 2) {
-          c[0] = (float(
-            kind * 64 + subKind * 16 +
-            8 + 4 + 2 + 1
-          ) + 0.5) / 256.0;
-          gl_FragColor = c;
+        if (kind == KindWire && subKind == WireSubKindOne) {
+          fragColor[0] = cellValueToColorComponent(makeCellValue(
+            kind, subKind, true, true, true, true
+          ));
           return;
         }
-        // Component
-        if (kind == 2) {
-          bool signal = false;
-          // And
-          if (subKind == 0) {
-            signal = (
-              (tKind == 1 ? tsb : true) &&
-              (bKind == 1 ? bst : true) &&
-              (rKind == 1 ? rsl : true) &&
-              (lKind == 1 ? lsr : true)
+        if (kind == KindComponent) {
+          bool signaled = false;
+          if (subKind == ComponentSubKindAnd) {
+            signaled = (
+              (tKind == KindWire ? tSignalB : true) &&
+              (bKind == KindWire ? bSignalT : true) &&
+              (rKind == KindWire ? rSignalL : true) &&
+              (lKind == KindWire ? lSignalR : true)
             );
           }
-          // Or
-          if (subKind == 1) {
-            signal = (
-              (tKind == 1 && tsb) ||
-              (bKind == 1 && bst) ||
-              (rKind == 1 && rsl) ||
-              (lKind == 1 && lsr)
+          if (subKind == ComponentSubKindOr) {
+            signaled = (
+              (tKind == 1 && tSignalB) ||
+              (bKind == 1 && bSignalT) ||
+              (rKind == 1 && rSignalL) ||
+              (lKind == 1 && lSignalR)
             );
           }
-          // Xor
-          if (subKind == 2) {
-            signal = (
-              mod(
-                (
-                  float(tKind == 1 && tsb) +
-                  float(bKind == 1 && bst) +
-                  float(rKind == 1 && rsl) +
-                  float(lKind == 1 && lsr)
-                ),
-                2.0
-              ) == 1.0
-            );
+          if (subKind == ComponentSubKindXor) {
+            signaled = (
+              ((tKind == 1 && tSignalB) ? 1 : 0) +
+              ((bKind == 1 && bSignalT) ? 1 : 0) +
+              ((rKind == 1 && rSignalL) ? 1 : 0) +
+              ((lKind == 1 && lSignalR) ? 1 : 0)
+            ) % 2 == 1;
           }
-          c[0] = (float(
-            kind * 64 + subKind * 16 +
-            ((signal && tKind == 3) ? 8 : 0) +
-            ((signal && rKind == 3) ? 4 : 0) +
-            ((signal && bKind == 3) ? 2 : 0) +
-            ((signal && lKind == 3) ? 1 : 0)
-          ) + 0.5) / 256.0;
-          gl_FragColor = c;
+          fragColor[0] = cellValueToColorComponent(makeCellValue(
+            kind, subKind,
+            signaled && tKind == KindOut,
+            signaled && rKind == KindOut,
+            signaled && bKind == KindOut,
+            signaled && lKind == KindOut
+          ));
           return;
         }
-        // Out/NotOut
-        if (kind == 3) {
-          bool isSignaled = (
-            (tKind == 2 && tsb) ||
-            (bKind == 2 && bst) ||
-            (rKind == 2 && rsl) ||
-            (lKind == 2 && lsr)
+        if (kind == KindOut) {
+          bool signaled = (
+            (tKind == KindComponent && tSignalB) ||
+            (bKind == KindComponent && bSignalT) ||
+            (rKind == KindComponent && rSignalL) ||
+            (lKind == KindComponent && lSignalR)
           );
-          bool signal = (subKind == 1) ? !isSignaled : isSignaled;
-          c[0] = (float(
-            kind * 64 + subKind * 16 +
-            ((signal && tKind == 1) ? 8 : 0) +
-            ((signal && rKind == 1) ? 4 : 0) +
-            ((signal && bKind == 1) ? 2 : 0) +
-            ((signal && lKind == 1) ? 1 : 0)
-          ) + 0.5) / 256.0;
-          gl_FragColor = c;
+          bool signal = (subKind == OutSubKindInvOut) ? !signaled : signaled;
+          fragColor[0] = cellValueToColorComponent(makeCellValue(
+            kind, subKind,
+            signal && tKind == KindWire,
+            signal && rKind == KindWire,
+            signal && bKind == KindWire,
+            signal && lKind == KindWire
+          ));
           return;
         }
-        //gl_FragColor = c;
       }
     `);
     gl.compileShader(fragmentShader);
