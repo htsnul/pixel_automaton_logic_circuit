@@ -1,3 +1,5 @@
+import { shaderProgram } from "./shaderProgram.js"
+
 const circuitFilenames = [
   "logic_gates.json",
   "0_1_hold.json",
@@ -17,8 +19,6 @@ const circuitFilenames = [
   "7_segment_display.json"
 ];
 let gl;
-let programForUpdate;
-let programForRender;
 let dummyTexture;
 let targetTextures = [];
 let targetTextureIndex = 0;
@@ -114,298 +114,7 @@ async function loadCircuit(filename) {
 function initGl() {
   const canvas = document.querySelector("canvas");
   gl = canvas.getContext("webgl2");
-  programForUpdate = (() => {
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, `#version 300 es
-      void main() {
-        gl_Position = vec4(0.0, 0.0, 0.0, 1);
-        gl_PointSize = 512.0;
-      }
-    `);
-    gl.compileShader(vertexShader);
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, `#version 300 es
-      precision mediump float;
-
-      uniform sampler2D uSampler;
-      out vec4 fragColor;
-
-      const int KindNone = 0;
-      const int KindWire = 1;
-      const int KindComponent = 2;
-      const int KindOut = 3;
-      const int WireSubKindWire = 0;
-      const int WireSubKindCross = 1;
-      const int WireSubKindOne = 2;
-      const int ComponentSubKindAnd = 0;
-      const int ComponentSubKindOr = 1;
-      const int ComponentSubKindXor = 2;
-      const int OutSubKindOut = 0;
-      const int OutSubKindInvOut = 1;
-
-      int cellValueFromColorComponent(float col) { return int(255.0 * col + 0.5); }
-      float cellValueToColorComponent(int val) { return float(val) / 255.0; }
-
-      int getCellKind(int val) { return val / 64; }
-      int getCellSubKind(int val) { return val / 16 % 4; }
-      bool getCellSignalT(int val) { return bool(val / 8 % 2); }
-      bool getCellSignalR(int val) { return bool(val / 4 % 2); }
-      bool getCellSignalB(int val) { return bool(val / 2 % 2); }
-      bool getCellSignalL(int val) { return bool(val % 2); }
-
-      int makeCellValue(
-        int kind, int subKind,
-        bool signalT, bool signalR, bool signalB, bool signalL
-      ) {
-        return (
-          kind * 64 +
-          subKind * 16 +
-          (signalT ? 8 : 0) +
-          (signalR ? 4 : 0) +
-          (signalB ? 2 : 0) +
-          (signalL ? 1 : 0)
-        );
-      }
-
-      void main() {
-        const float texW = 256.0f;
-        vec4 col = texture(uSampler, gl_FragCoord.xy / texW);
-        int cellVal = cellValueFromColorComponent(col[0]);
-        int kind = getCellKind(cellVal);
-        // None
-        if (kind == 0) {
-          fragColor[0] = 0.0;
-          return;
-        }
-        int subKind = getCellSubKind(cellVal);
-        vec4 colT = texture(uSampler, (gl_FragCoord.xy + vec2(+0.0, +1.0)) / texW);
-        vec4 colR = texture(uSampler, (gl_FragCoord.xy + vec2(+1.0, +0.0)) / texW);
-        vec4 colB = texture(uSampler, (gl_FragCoord.xy + vec2(+0.0, -1.0)) / texW);
-        vec4 colL = texture(uSampler, (gl_FragCoord.xy + vec2(-1.0, +0.0)) / texW);
-        int cellValT = cellValueFromColorComponent(colT[0]);
-        int cellValR = cellValueFromColorComponent(colR[0]);
-        int cellValB = cellValueFromColorComponent(colB[0]);
-        int cellValL = cellValueFromColorComponent(colL[0]);
-        int tKind = getCellKind(cellValT);
-        int tSubKind = getCellSubKind(cellValT);
-        bool tSignalB = getCellSignalB(cellValT);
-        int rKind = getCellKind(cellValR);
-        int rSubKind = getCellSubKind(cellValR);
-        bool rSignalL = getCellSignalL(cellValR);
-        int bKind = getCellKind(cellValB);
-        int bSubKind = getCellSubKind(cellValB);
-        bool bSignalT = getCellSignalT(cellValB);
-        int lKind = getCellKind(cellValL);
-        int lSubKind = getCellSubKind(cellValL);
-        bool lSignalR = getCellSignalR(cellValL);
-        if (kind == KindWire && subKind == WireSubKindWire) {
-          bool signaled = tSignalB || bSignalT || rSignalL || lSignalR;
-          fragColor[0] = cellValueToColorComponent(makeCellValue(
-            kind, subKind,
-            signaled && !tSignalB,
-            signaled && !rSignalL,
-            signaled && !bSignalT,
-            signaled && !lSignalR
-          ));
-          return;
-        }
-        if (kind == KindWire && subKind == WireSubKindCross) {
-          bool signaledV = tSignalB || bSignalT;
-          bool signaledH = rSignalL || lSignalR;
-          fragColor[0] = cellValueToColorComponent(makeCellValue(
-            kind, subKind,
-            signaledV && !tSignalB,
-            signaledH && !rSignalL,
-            signaledV && !bSignalT,
-            signaledH && !lSignalR
-          ));
-          return;
-        }
-        if (kind == KindWire && subKind == WireSubKindOne) {
-          fragColor[0] = cellValueToColorComponent(makeCellValue(
-            kind, subKind, true, true, true, true
-          ));
-          return;
-        }
-        if (kind == KindComponent) {
-          bool signaled = false;
-          if (subKind == ComponentSubKindAnd) {
-            signaled = (
-              (tKind == KindWire ? tSignalB : true) &&
-              (bKind == KindWire ? bSignalT : true) &&
-              (rKind == KindWire ? rSignalL : true) &&
-              (lKind == KindWire ? lSignalR : true)
-            );
-          }
-          if (subKind == ComponentSubKindOr) {
-            signaled = (
-              (tKind == 1 && tSignalB) ||
-              (bKind == 1 && bSignalT) ||
-              (rKind == 1 && rSignalL) ||
-              (lKind == 1 && lSignalR)
-            );
-          }
-          if (subKind == ComponentSubKindXor) {
-            signaled = (
-              ((tKind == 1 && tSignalB) ? 1 : 0) +
-              ((bKind == 1 && bSignalT) ? 1 : 0) +
-              ((rKind == 1 && rSignalL) ? 1 : 0) +
-              ((lKind == 1 && lSignalR) ? 1 : 0)
-            ) % 2 == 1;
-          }
-          fragColor[0] = cellValueToColorComponent(makeCellValue(
-            kind, subKind,
-            signaled && tKind == KindOut,
-            signaled && rKind == KindOut,
-            signaled && bKind == KindOut,
-            signaled && lKind == KindOut
-          ));
-          return;
-        }
-        if (kind == KindOut) {
-          bool signaled = (
-            (tKind == KindComponent && tSignalB) ||
-            (bKind == KindComponent && bSignalT) ||
-            (rKind == KindComponent && rSignalL) ||
-            (lKind == KindComponent && lSignalR)
-          );
-          bool signal = (subKind == OutSubKindInvOut) ? !signaled : signaled;
-          fragColor[0] = cellValueToColorComponent(makeCellValue(
-            kind, subKind,
-            signal && tKind == KindWire,
-            signal && rKind == KindWire,
-            signal && bKind == KindWire,
-            signal && lKind == KindWire
-          ));
-          return;
-        }
-      }
-    `);
-    gl.compileShader(fragmentShader);
-    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-      console.log(gl.getShaderInfoLog(fragmentShader));
-    }
-    const program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    gl.detachShader(program, vertexShader);
-    gl.detachShader(program, fragmentShader);
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.log(gl.getProgramInfoLog(program));
-    }
-    return program;
-  })();
-  programForRender = (() => {
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, `
-      #version 100
-
-      void main() {
-        gl_Position = vec4(0.0, 0.0, 0.0, 1);
-        gl_PointSize = 512.0;
-      }
-    `);
-    gl.compileShader(vertexShader);
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, `
-      #version 100
-      precision mediump float;
-
-      uniform sampler2D uSampler;
-
-      void main() {
-        vec4 c = vec4(0, 0, 0, 1);
-        vec4 sc = texture2D(uSampler, vec2(gl_FragCoord.x / 256.0, gl_FragCoord.y / 256.0));
-        int kind = int(256.0 * sc[0] / 64.0);
-        // None
-        if (kind == 0) {
-          gl_FragColor = c;
-          return;
-        }
-        int subKind = int(mod(256.0 * sc[0] / 16.0, 4.0));
-        bool st = bool(floor(mod(256.0 * sc[0] / 8.0, 2.0)));
-        bool sr = bool(floor(mod(256.0 * sc[0] / 4.0, 2.0)));
-        bool sb = bool(floor(mod(256.0 * sc[0] / 2.0, 2.0)));
-        bool sl = bool(floor(mod(256.0 * sc[0], 2.0)));
-        // And
-        if (kind == 2 && subKind == 0) {
-          c[0] = 1.0;
-          c[1] = 0.9;
-          c[2] = 0.5;
-          gl_FragColor = c;
-          return;
-        }
-        // Or
-        if (kind == 2 && subKind == 1) {
-          c[0] = 0.25;
-          c[1] = 1.0;
-          c[2] = 0.25;
-          gl_FragColor = c;
-          return;
-        }
-        // Xor
-        if (kind == 2 && subKind == 2) {
-          c[0] = 1.0;
-          c[1] = 0.0;
-          c[2] = 1.0;
-          gl_FragColor = c;
-          return;
-        }
-        // Out
-        if (kind == 3 && subKind == 0) {
-          c[0] = 0.2;
-          c[1] = 0.2;
-          c[2] = 1.0;
-          gl_FragColor = c;
-          return;
-        }
-        // Not
-        if (kind == 3 && subKind == 1) {
-          c[0] = 1.0;
-          c[1] = 0.5;
-          c[2] = 0.5;
-          gl_FragColor = c;
-          return;
-        }
-        if (st || sb || sr || sl) {
-          c[0] = 1.0;
-          c[1] = 1.0;
-          c[2] = 1.0;
-          gl_FragColor = c;
-          return;
-        }
-        // Wire
-        if (kind == 1) {
-          c[0] = 0.5;
-          c[1] = 0.5;
-          c[2] = 0.5;
-          gl_FragColor = c;
-          return;
-        }
-        gl_FragColor = c;
-      }
-    `);
-    gl.compileShader(fragmentShader);
-    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-      alert(gl.getShaderInfoLog(fragmentShader));
-    }
-    const program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    gl.detachShader(program, vertexShader);
-    gl.detachShader(program, fragmentShader);
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      const linkErrLog = gl.getProgramInfoLog(program);
-      console.log(linkErrLog);
-    }
-    return program;
-  })();
+  shaderProgram.initialize(gl);
   dummyTexture = gl.createTexture();
   {
     gl.bindTexture(gl.TEXTURE_2D, dummyTexture);
@@ -493,21 +202,21 @@ function updateGl() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbs[targetTextureIndex]);
   //gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-  gl.useProgram(programForUpdate);
+  gl.useProgram(shaderProgram.programForUpdate);
   gl.clearColor(0, 1, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
   //gl.enableVertexAttribArray(0);
   //gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   //gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
   gl.bindTexture(gl.TEXTURE_2D, targetTextures[targetTextureIndex == 0 ? 1 : 0]);
-  gl.uniform1i(gl.getUniformLocation(programForUpdate, "uSampler"), 0);
+  gl.uniform1i(gl.getUniformLocation(shaderProgram.programForUpdate, "uSampler"), 0);
   gl.drawArrays(gl.POINTS, 0, 1);
   targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
 }
 
 function renderGl() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.useProgram(programForRender);
+  gl.useProgram(shaderProgram.programForRender);
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
   gl.clearColor(1, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
@@ -519,7 +228,7 @@ function renderGl() {
   {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, targetTextures[0]);
-    gl.uniform1i(gl.getUniformLocation(programForRender, "uSampler"), 0);
+    gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
   }
   gl.drawArrays(gl.POINTS, 0, 1);
 }
