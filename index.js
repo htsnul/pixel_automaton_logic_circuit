@@ -32,6 +32,7 @@ let circuitData;
 let frameIndex = 0;
 let clockIsOn = false;
 
+let position = { x: 0, y: 0 };
 let zoomLevel = 2.0;
 let targetZoomLevel = zoomLevel;
 
@@ -215,8 +216,6 @@ function updateGl() {
   targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
 }
 
-let x = 0;
-
 function renderGl() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.useProgram(shaderProgram.programForRender);
@@ -228,16 +227,14 @@ function renderGl() {
   {
     gl.bindTexture(gl.TEXTURE_2D, targetTextures[0]);
     gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
-    //x += 1;
     gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uWidth"), width);
-    gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForRender, "uPosition"), [x, 0]);
+    gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForRender, "uPosition"), [position.x, position.y]);
     zoomLevel += (targetZoomLevel - zoomLevel) / 8;
     if (Math.abs(zoomLevel - targetZoomLevel) < 1 / 256) {
       zoomLevel = targetZoomLevel;
     }
     const scale = Math.pow(2, zoomLevel);
     gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uScale"), scale);
-    if (x > width) { x = 0; }
   }
   gl.drawArrays(gl.POINTS, 0, 1);
 }
@@ -292,6 +289,28 @@ onload = async () => {
     canvas.height = height;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    let isDragging = false;
+    canvas.onpointerdown = (event) => {
+      isDragging = true;
+      canvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    }
+    canvas.onpointermove = (event) => {
+      if (!isDragging) {
+        return;
+      }
+      const scale = Math.pow(2, zoomLevel);
+      position.x += event.movementX / scale;
+      position.y -= event.movementY / scale;
+      event.preventDefault();
+    }
+    canvas.onpointerup = (event) => {
+      if (!isDragging) {
+        return;
+      }
+      isDragging = false;
+      event.preventDefault();
+    }
     document.querySelector("main").append(canvas);
     initGl();
   }
