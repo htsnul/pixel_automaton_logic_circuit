@@ -25,12 +25,15 @@ let targetTextureIndex = 0;
 let fbs = [];
 let buffer;
 
-let width = 256;;
+let width = 512;
 let height = width;
 let cells = [];
 let circuitData;
 let frameIndex = 0;
 let clockIsOn = false;
+
+let zoomLevel = 2.0;
+let targetZoomLevel = zoomLevel;
 
 function makeCell(kind, pushingTo) {
   return { kind, pushingTo };
@@ -60,7 +63,7 @@ async function loadCircuit(filename) {
   cells = [];
   for (let y = 0; y < height; ++y) {
     cells.push([]);
-    const str = strs[Math.min(strs.length, y)] + " ".repeat(1024);
+    const str = strs[Math.min(strs.length, y)] + " ".repeat(width);
     //const str = strs[Math.min(strs.length, y)];
     for (let x = 0; x < width; ++x) {
       cells[y].push(
@@ -188,8 +191,6 @@ function initGl() {
       );
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       fbs[i] = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbs[i]);
       const attachmentPoint = gl.COLOR_ATTACHMENT0;
@@ -205,8 +206,6 @@ function updateGl() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbs[targetTextureIndex]);
   //gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
   gl.useProgram(shaderProgram.programForUpdate);
-  gl.clearColor(0, 1, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
   //gl.enableVertexAttribArray(0);
   //gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   //gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
@@ -216,12 +215,11 @@ function updateGl() {
   targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
 }
 
+let x = 0;
+
 function renderGl() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.useProgram(shaderProgram.programForRender);
-  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-  gl.clearColor(1, 0, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
   if (0) {
     gl.enableVertexAttribArray(0);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -230,6 +228,16 @@ function renderGl() {
   {
     gl.bindTexture(gl.TEXTURE_2D, targetTextures[0]);
     gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
+    //x += 1;
+    gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uWidth"), width);
+    gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForRender, "uPosition"), [x, 0]);
+    zoomLevel += (targetZoomLevel - zoomLevel) / 8;
+    if (Math.abs(zoomLevel - targetZoomLevel) < 1 / 256) {
+      zoomLevel = targetZoomLevel;
+    }
+    const scale = Math.pow(2, zoomLevel);
+    gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uScale"), scale);
+    if (x > width) { x = 0; }
   }
   gl.drawArrays(gl.POINTS, 0, 1);
 }
@@ -256,14 +264,22 @@ function prepareList() {
 
 onload = async () => {
   {
-    const header = document.createElement("header");
-    if (0) {
-      const button = document.createElement("button");
-      button.innerHTML = "List";
-      button.onclick = () => prepareList();
-      header.append(button);
-    }
-    document.body.append(header);
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <button id="zoom-out-button">-</button>
+      <input id="zoom-ratio" disabled style="width: 50px;">
+      <button id="zoom-in-button">+</button>
+    `;
+    const zoom = (sign) => {
+      if (zoom !== 0) {
+        targetZoomLevel = Math.min(Math.max(0, targetZoomLevel + sign), 4);
+      }
+      div.querySelector("#zoom-ratio").value = 100 * Math.pow(2, targetZoomLevel) + "%";
+    };
+    zoom(0);
+    div.querySelector("#zoom-out-button").onclick = () => zoom(-1);
+    div.querySelector("#zoom-in-button").onclick = () => zoom(+1);
+    document.body.append(div);
   }
   {
     const main = document.createElement("main");
@@ -274,9 +290,8 @@ onload = async () => {
     canvas.style.imageRendering = "pixelated";
     canvas.width = width;
     canvas.height = height;
-    const scale = Math.min(Math.max(Math.floor(512 / Math.max(width, height)), 1), 16);
-    canvas.style.width = `${scale * width}px`;
-    canvas.style.height = `${scale * height}px`;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
     document.querySelector("main").append(canvas);
     initGl();
   }

@@ -54,7 +54,7 @@ const fragmentShaderForUpdateSource = `#version 300 es
   ${commonUtilSource}
 
   void main() {
-    const float texW = 256.0f;
+    const float texW = 512.0f;
     vec4 col = texture(uSampler, gl_FragCoord.xy / texW);
     int cellVal = cellValueFromColorComponent(col[0]);
     int kind = getCellKind(cellVal);
@@ -169,13 +169,19 @@ const fragmentShaderForRenderSource = `#version 300 es
   precision mediump float;
 
   uniform sampler2D uSampler;
+  uniform float uWidth;
+  uniform vec2 uPosition;
+  uniform float uScale;
 
   out vec4 fragColor;
 
   ${commonUtilSource}
 
   void main() {
-    vec4 col = texture(uSampler, vec2(gl_FragCoord.x / 256.0, gl_FragCoord.y / 256.0));
+    vec4 col = texture(
+      uSampler,
+      (gl_FragCoord.xy - 0.5 * uWidth) / (uWidth * uScale) - uPosition / uWidth
+    );
     int cellVal = cellValueFromColorComponent(col[0]);
     int kind = getCellKind(cellVal);
     int subKind = getCellSubKind(cellVal);
