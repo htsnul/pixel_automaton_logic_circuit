@@ -25,8 +25,8 @@ let targetTextureIndex = 0;
 let fbs = [];
 let buffer;
 
-let width;
-let height;
+let width = 256;;
+let height = width;
 let cells = [];
 let circuitData;
 let frameIndex = 0;
@@ -57,8 +57,6 @@ async function loadCircuit(filename) {
   const strs = circuitData.dataStrs;
   //height = strs.length;
   //width = strs[0].length;
-  height = 256;
-  width = 256;
   cells = [];
   for (let y = 0; y < height; ++y) {
     cells.push([]);
@@ -97,16 +95,57 @@ async function loadCircuit(filename) {
       }
     }
   }
-  {
-    const canvas = document.createElement("canvas");
-    canvas.style.imageRendering = "pixelated";
-    canvas.width = width;
-    canvas.height = height;
-    const scale = Math.min(Math.max(Math.floor(512 / Math.max(width, height)), 1), 16);
-    canvas.style.width = `${scale * width}px`;
-    canvas.style.height = `${scale * height}px`;
-    document.querySelector("main").replaceChildren(canvas);
-    initGl();
+  for (let i = 0; i < 2; ++i) {
+    gl.bindTexture(gl.TEXTURE_2D, targetTextures[i]);
+    const pixels = new Uint8Array(width * height);
+    for (let y = 0; y < height; ++y) {
+      for (let x = 0; x < width; ++x) {
+        const cell = cells[y][x];
+        let kind = 0;
+        let subKind = 0;
+        if (cell.kind === "Wire") {
+          kind = 1;
+          subKind = 0;
+        }
+        if (cell.kind === "Cross") {
+          kind = 1;
+          subKind = 1;
+        }
+        if (cell.kind === "One") {
+          kind = 1;
+          subKind = 2;
+        }
+        if (cell.kind === "And") {
+          kind = 2;
+          subKind = 0;
+        }
+        if (cell.kind === "Or") {
+          kind = 2;
+          subKind = 1;
+        }
+        if (cell.kind === "Xor") {
+          kind = 2;
+          subKind = 2;
+        }
+        if (cell.kind === "Out") {
+          kind = 3;
+          subKind = 0;
+        }
+        if (cell.kind === "NotOut") {
+          kind = 3;
+          subKind = 1;
+        }
+        pixels[((height - y - 1) * width + x)] = (kind << 6) + (subKind << 4);
+      }
+    }
+    gl.texSubImage2D(
+      gl.TEXTURE_2D,
+      0, 0, 0,
+      width, height,
+      gl.RED,
+      gl.UNSIGNED_BYTE,
+      pixels
+    );
   }
   frameIndex = 0;
 }
@@ -134,45 +173,8 @@ function initGl() {
     {
       gl.bindTexture(gl.TEXTURE_2D, targetTextures[i]);
       const pixels = new Uint8Array(width * height);
-      for (let y = 0; y < height; ++y) {
-        for (let x = 0; x < width; ++x) {
-          const cell = cells[y][x];
-          let kind = 0;
-          let subKind = 0;
-          if (cell.kind === "Wire") {
-            kind = 1;
-            subKind = 0;
-          }
-          if (cell.kind === "Cross") {
-            kind = 1;
-            subKind = 1;
-          }
-          if (cell.kind === "One") {
-            kind = 1;
-            subKind = 2;
-          }
-          if (cell.kind === "And") {
-            kind = 2;
-            subKind = 0;
-          }
-          if (cell.kind === "Or") {
-            kind = 2;
-            subKind = 1;
-          }
-          if (cell.kind === "Xor") {
-            kind = 2;
-            subKind = 2;
-          }
-          if (cell.kind === "Out") {
-            kind = 3;
-            subKind = 0;
-          }
-          if (cell.kind === "NotOut") {
-            kind = 3;
-            subKind = 1;
-          }
-          pixels[((height - y - 1) * width + x)] = (kind << 6) + (subKind << 4);
-        }
+      for (let i = 0; i < pixels.length; ++i) {
+        pixels[i] = 0;
       }
       gl.texImage2D(
         gl.TEXTURE_2D,
@@ -185,6 +187,7 @@ function initGl() {
         pixels
       );
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       fbs[i] = gl.createFramebuffer();
@@ -200,8 +203,7 @@ function initGl() {
 
 function updateGl() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbs[targetTextureIndex]);
-  //gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  //gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
   gl.useProgram(shaderProgram.programForUpdate);
   gl.clearColor(0, 1, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
@@ -226,7 +228,6 @@ function renderGl() {
     gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
   }
   {
-    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, targetTextures[0]);
     gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
   }
@@ -250,13 +251,13 @@ function prepareList() {
     li.append(button);
     ul.append(li);
   });
-  document.querySelector("main").replaceChildren(ul);
+  document.querySelector("main").append(ul);
 }
 
 onload = async () => {
   {
     const header = document.createElement("header");
-    {
+    if (0) {
       const button = document.createElement("button");
       button.innerHTML = "List";
       button.onclick = () => prepareList();
@@ -267,6 +268,17 @@ onload = async () => {
   {
     const main = document.createElement("main");
     document.body.append(main);
+  }
+  {
+    const canvas = document.createElement("canvas");
+    canvas.style.imageRendering = "pixelated";
+    canvas.width = width;
+    canvas.height = height;
+    const scale = Math.min(Math.max(Math.floor(512 / Math.max(width, height)), 1), 16);
+    canvas.style.width = `${scale * width}px`;
+    canvas.style.height = `${scale * height}px`;
+    document.querySelector("main").append(canvas);
+    initGl();
   }
   prepareList();
   requestAnimationFrame(update);
@@ -378,11 +390,8 @@ function renderCell(imageData, x, y, cell) {
 function update() {
   //setTimeout(() => requestAnimationFrame(update), 500);
   requestAnimationFrame(update);
-  if (!circuitData) {
-    return;
-  }
   for (let i = 0; i < 0; ++i) {
-    {
+    if (circuitData) {
       const cycleCount = circuitData.cycleCount;
       const inputCount = circuitData.inputCount;
       const values = circuitData.values;
