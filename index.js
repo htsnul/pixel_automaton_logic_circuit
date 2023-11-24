@@ -259,10 +259,29 @@ function prepareList() {
   document.querySelector("main").append(ul);
 }
 
+function getCurrentPointerActionKind() {
+  return document.querySelector("input[name='pointer-action-kind']:checked").value;
+}
+
+function getCurrentCellKind() {
+  return document.querySelector("input[name='cell-kind']:checked").value;
+}
+
 onload = async () => {
   {
     const div = document.createElement("div");
     div.innerHTML = `
+      <label><input name="pointer-action-kind" type="radio" value="Scroll">Scroll</label>
+      <label><input name="pointer-action-kind" type="radio" value="Draw" checked>Draw</label>
+      <label><input name="cell-kind" type="radio" value="None">None</label>
+      <label><input name="cell-kind" type="radio" value="Wire" checked>Wire</label>
+      <label><input name="cell-kind" type="radio" value="Cross">Cross</label>
+      <label><input name="cell-kind" type="radio" value="One">1</label>
+      <label><input name="cell-kind" type="radio" value="And">AND</label>
+      <label><input name="cell-kind" type="radio" value="Or">OR</label>
+      <label><input name="cell-kind" type="radio" value="Xor">XOR</label>
+      <label><input name="cell-kind" type="radio" value="Out">Out</label>
+      <label><input name="cell-kind" type="radio" value="InvOut">Inv-Out</label>
       <button id="zoom-out-button">-</button>
       <input id="zoom-ratio" disabled style="width: 50px;">
       <button id="zoom-in-button">+</button>
@@ -290,24 +309,62 @@ onload = async () => {
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     let isDragging = false;
+    const drawByPointerEvent = (event) => {
+      const scale = Math.pow(2, zoomLevel);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbs[targetTextureIndex]);
+      gl.useProgram(shaderProgram.programForEdit);
+      gl.bindTexture(gl.TEXTURE_2D, targetTextures[targetTextureIndex == 0 ? 1 : 0]);
+      gl.uniform1i(gl.getUniformLocation(shaderProgram.programForEdit, "uSampler"), 0);
+      const canvasClientRect = canvas.getBoundingClientRect();
+      const pos = {
+        x: Math.round((event.clientX - canvasClientRect.x - 0.5 * width) / scale - position.x) + 0.5,
+        y: -Math.round((event.clientY - canvasClientRect.y - 0.5 * height) / scale + position.y) + 0.5
+      };
+      if (pos.x < 0) pos.x += width;
+      if (pos.y < 0) pos.y += width;
+      gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForEdit, "uPosition"), [pos.x, pos.y]);
+      const cellValue = (() => {
+        const cellKind = getCurrentCellKind();
+        switch (cellKind) {
+          case "None": return (0 << 6) + (0 << 4);
+          case "Wire": return (1 << 6) + (0 << 4);
+          case "Cross": return (1 << 6) + (1 << 4);
+          case "One": return (1 << 6) + (2 << 4);
+          case "And": return (2 << 6) + (0 << 4);
+          case "Or": return (2 << 6) + (1 << 4);
+          case "Xor": return (2 << 6) + (2 << 4);
+          case "Out": return (3 << 6) + (0 << 4);
+          case "InvOut": return (3 << 6) + (1 << 4);
+        }
+      })();
+      gl.uniform1i(gl.getUniformLocation(shaderProgram.programForEdit, "uCellValue"), cellValue);
+      gl.drawArrays(gl.POINTS, 0, 1);
+      targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
+    };
     canvas.onpointerdown = (event) => {
       isDragging = true;
       canvas.setPointerCapture(event.pointerId);
+      const pointerActionKind = getCurrentPointerActionKind();
+      if (pointerActionKind === "Draw") {
+        drawByPointerEvent(event);
+      }
       event.preventDefault();
     }
     canvas.onpointermove = (event) => {
       if (!isDragging) {
         return;
       }
-      const scale = Math.pow(2, zoomLevel);
-      position.x += event.movementX / scale;
-      position.y -= event.movementY / scale;
+      const pointerActionKind = getCurrentPointerActionKind();
+      if (pointerActionKind === "Scroll") {
+        const scale = Math.pow(2, zoomLevel);
+        position.x += event.movementX / scale;
+        position.y -= event.movementY / scale;
+      } else if (pointerActionKind === "Draw") {
+        drawByPointerEvent(event);
+      }
       event.preventDefault();
     }
     canvas.onpointerup = (event) => {
-      if (!isDragging) {
-        return;
-      }
       isDragging = false;
       event.preventDefault();
     }

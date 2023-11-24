@@ -165,6 +165,28 @@ const fragmentShaderForUpdateSource = `#version 300 es
   }
 `;
 
+const fragmentShaderForEditSource = `#version 300 es
+  precision mediump float;
+
+  uniform sampler2D uSampler;
+  uniform vec2 uPosition;
+  uniform int uCellValue;
+  out vec4 fragColor;
+
+  ${commonUtilSource}
+
+  void main() {
+    const float texW = 512.0f;
+    vec4 col = texture(uSampler, gl_FragCoord.xy / texW);
+    int cellVal = cellValueFromColorComponent(col[0]);
+    if (gl_FragCoord.xy != uPosition) {
+      fragColor[0] = cellValueToColorComponent(cellVal);
+      return;
+    }
+    fragColor[0] = cellValueToColorComponent(uCellValue);
+  }
+`;
+
 const fragmentShaderForRenderSource = `#version 300 es
   precision mediump float;
 
@@ -194,11 +216,14 @@ const fragmentShaderForRenderSource = `#version 300 es
     vec4 normalColor = vec4(0.2, 0.2, 0.2, 1.0);
     vec4 signalColor = vec4(0.2, 0.2, 0.2, 1.0);
     if (kind == CellKindWire && subKind == CellWireKindWire) {
-      normalColor = vec4(0.6, 0.6, 0.6, 1.0);
-      signalColor = vec4(1.0, 1.0, 1.0, 1.0);
+      normalColor = vec4(0.5, 0.5, 0.5, 1.0);
+      signalColor = vec4(0.75, 0.75, 0.75, 1.0);
     } else if (kind == CellKindWire && subKind == CellWireKindCross) {
       normalColor = vec4(0.4, 0.7, 0.4, 1.0);
       signalColor = vec4(0.8, 0.9, 0.8, 1.0);
+    } else if (kind == CellKindWire && subKind == CellWireKindOne) {
+      normalColor = vec4(0.6, 0.6, 0.6, 1.0);
+      signalColor = vec4(1.0, 1.0, 1.0, 1.0);
     } else if (kind == CellKindComponent && subKind == CellComponentKindAnd) {
       normalColor = vec4(1.0, 0.8, 0.5, 1.0);
       signalColor = normalColor;
@@ -221,12 +246,18 @@ const fragmentShaderForRenderSource = `#version 300 es
 
 class ShaderProgram {
   programForUpdate = undefined;
+  programForEdit = undefined;
   programForRender = undefined;
   initialize(gl) {
     this.programForUpdate = this.#createProgram(
       gl,
       vertexShaderForEntireSurfaceSource,
       fragmentShaderForUpdateSource
+    );
+    this.programForEdit = this.#createProgram(
+      gl,
+      vertexShaderForEntireSurfaceSource,
+      fragmentShaderForEditSource
     );
     this.programForRender = this.#createProgram(
       gl,
