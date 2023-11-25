@@ -80,6 +80,8 @@ let clockIsOn = false;
 let position = { x: 0, y: 0 };
 let zoomLevel = 4.0;
 let targetZoomLevel = zoomLevel;
+let pointerPosInFragCoord = { x: 0, y: 0 };
+let isDragging = false;
 
 let restFrameCountToUpdate = 0;
 
@@ -229,6 +231,34 @@ function renderGl() {
     gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
     gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uWidth"), width);
     gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForRender, "uPosition"), [position.x, position.y]);
+    {
+      const pointerActionKind = getCurrentPointerActionKind();
+      const isOverlayCellEnabled = (
+        pointerActionKind === "Draw" ||
+        pointerActionKind === "Signal"
+      );
+      gl.uniform1i(
+        gl.getUniformLocation(shaderProgram.programForRender, "uOverlayCellIsEnabled"),
+        isOverlayCellEnabled
+      );
+      if (isOverlayCellEnabled) {
+        gl.uniform2fv(
+          gl.getUniformLocation(shaderProgram.programForRender, "uOverlayCellPosition"),
+          [pointerPosInFragCoord.x, pointerPosInFragCoord.y]
+        );
+        const cellValue = (() => {
+          if (pointerActionKind === "Draw") {
+            return getCurrentCellValue();
+          } else if (pointerActionKind === "Signal") {
+            return cellValueFromCellSerialKind("Wire") | 0x0f;
+          }
+        })();
+        gl.uniform1i(
+          gl.getUniformLocation(shaderProgram.programForRender, "uOverlayCellValue"),
+          cellValue
+        );
+      }
+    }
     zoomLevel += (targetZoomLevel - zoomLevel) / 8;
     if (Math.abs(zoomLevel - targetZoomLevel) < 1 / 256) {
       zoomLevel = targetZoomLevel;
@@ -263,8 +293,25 @@ function getCurrentPointerActionKind() {
   return document.querySelector("input[name='pointer-action-kind']:checked").value;
 }
 
-function getCurrentCellKind() {
+function getCurrentCellSerialKind() {
   return document.querySelector("input[name='cell-kind']:checked").value;
+}
+
+function cellValueFromCellSerialKind(kind) {
+  switch (kind) {
+    case "None": return (0 << 6) + (0 << 4);
+    case "Wire": return (1 << 6) + (0 << 4);
+    case "WireCross": return (1 << 6) + (1 << 4);
+    case "InAnd": return (2 << 6) + (0 << 4);
+    case "InOr": return (2 << 6) + (1 << 4);
+    case "InXor": return (2 << 6) + (2 << 4);
+    case "Out": return (3 << 6) + (0 << 4);
+    case "OutNot": return (3 << 6) + (1 << 4);
+  }
+}
+
+function getCurrentCellValue() {
+  return cellValueFromCellSerialKind(getCurrentCellSerialKind());
 }
 
 onload = async () => {
@@ -344,21 +391,21 @@ onload = async () => {
             <img src="icon/wire_icon.svg">
           </label></div>
           <div><label title="Wire-Cross">
-            <input name="cell-kind" type="radio" value="Cross">
+            <input name="cell-kind" type="radio" value="WireCross">
             <img src="icon/wire_cross_icon.svg">
           </label></div>
         </div>
         <div style="display: flex; margin: 8px;">
           <div><label title="In-AND">
-            <input name="cell-kind" type="radio" value="And">
+            <input name="cell-kind" type="radio" value="InAnd">
             <img src="icon/in_and_icon.svg">
           </label></div>
           <div><label title="In-OR">
-            <input name="cell-kind" type="radio" value="Or">
+            <input name="cell-kind" type="radio" value="InOr">
             <img src="icon/in_or_icon.svg">
           </label></div>
           <div><label title="In-XOR">
-            <input name="cell-kind" type="radio" value="Xo">
+            <input name="cell-kind" type="radio" value="InXor">
             <img src="icon/in_xor_icon.svg">
           </label></div>
         </div>
@@ -368,7 +415,7 @@ onload = async () => {
             <img src="icon/out_icon.svg">
             </label></div>
           <div><label title="Out-NOT">
-            <input name="cell-kind" type="radio" value="InvOut">
+            <input name="cell-kind" type="radio" value="OutNot">
             <img src="icon/out_not_icon.svg">
           </label></div>
         </div>
@@ -405,8 +452,7 @@ onload = async () => {
     canvas.height = height;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
-    let isDragging = false;
-    const getPositionInShaderFromEvent = (event) => {
+    const getPositionInFragCoordFromEvent = (event) => {
       const scale = Math.pow(2, zoomLevel);
       const canvasClientRect = canvas.getBoundingClientRect();
       const posOnCanvas = {
@@ -424,55 +470,28 @@ onload = async () => {
       return pos;
     };
     const drawByPointerEvent = (event) => {
-      const pos = getPositionInShaderFromEvent(event);
-      const cellVal = (() => {
-        const cellKind = getCurrentCellKind();
-        switch (cellKind) {
-          case "None": return (0 << 6) + (0 << 4);
-          case "Wire": return (1 << 6) + (0 << 4);
-          case "Cross": return (1 << 6) + (1 << 4);
-          case "One": return (1 << 6) + (2 << 4);
-          case "And": return (2 << 6) + (0 << 4);
-          case "Or": return (2 << 6) + (1 << 4);
-          case "Xor": return (2 << 6) + (2 << 4);
-          case "Out": return (3 << 6) + (0 << 4);
-          case "InvOut": return (3 << 6) + (1 << 4);
-        }
-      })();
       shaderProgram.doEditCommand(
         gl,
         cellTextures.nextFramebuffer,
         cellTextures.currentTexture,
         "Draw",
-        pos,
-        cellVal
-      );
-      cellTextures.advance();
-    };
-    const signalByPointerEvent = (event) => {
-      const pos = getPositionInShaderFromEvent(event);
-      shaderProgram.doEditCommand(
-        gl,
-        cellTextures.nextFramebuffer,
-        cellTextures.currentTexture,
-        "Signal",
-        pos,
-        undefined
+        getPositionInFragCoordFromEvent(event),
+        getCurrentCellValue()
       );
       cellTextures.advance();
     };
     canvas.onpointerdown = (event) => {
       isDragging = true;
+      pointerPosInFragCoord = getPositionInFragCoordFromEvent(event);
       canvas.setPointerCapture(event.pointerId);
       const pointerActionKind = getCurrentPointerActionKind();
       if (pointerActionKind === "Draw") {
         drawByPointerEvent(event);
-      } else if (pointerActionKind === "Signal") {
-        signalByPointerEvent(event);
       }
       event.preventDefault();
     }
     canvas.onpointermove = (event) => {
+      pointerPosInFragCoord = getPositionInFragCoordFromEvent(event);
       if (!isDragging) {
         return;
       }
@@ -483,12 +502,14 @@ onload = async () => {
         position.y -= event.movementY / scale;
       } else if (pointerActionKind === "Draw") {
         drawByPointerEvent(event);
-      } else if (pointerActionKind === "Signal") {
-        signalByPointerEvent(event);
       }
       event.preventDefault();
     }
     canvas.onpointerup = (event) => {
+      pointerPosInFragCoord = getPositionInFragCoordFromEvent(event);
+      if (!isDragging) {
+        return;
+      }
       isDragging = false;
       event.preventDefault();
     }
@@ -648,6 +669,17 @@ function update() {
   }
   for (let i = 0; i < updateCount; ++i) {
     updateGl();
+    if (getCurrentPointerActionKind() === "Signal" && isDragging) {
+      shaderProgram.doEditCommand(
+        gl,
+        cellTextures.nextFramebuffer,
+        cellTextures.currentTexture,
+        "Signal",
+        pointerPosInFragCoord,
+        undefined
+      );
+      cellTextures.advance();
+    }
   }
   if (0) {
     const canvas = document.querySelector("canvas");

@@ -223,17 +223,26 @@ const fragmentShaderForRenderSource = `#version 300 es
   uniform float uWidth;
   uniform vec2 uPosition;
   uniform float uScale;
+  uniform bool uOverlayCellIsEnabled;
+  uniform vec2 uOverlayCellPosition;
+  uniform int uOverlayCellValue;
 
   out vec4 fragColor;
 
   ${commonUtilSource}
 
+  vec2 getPositionInTexture() {
+    return (gl_FragCoord.xy - 0.5 * uWidth) / uScale - uPosition;
+  }
+
   void main() {
-    vec4 col = texture(
-      uSampler,
-      (gl_FragCoord.xy - 0.5 * uWidth) / (uWidth * uScale) - uPosition / uWidth
-    );
+    vec2 posInTex = getPositionInTexture();
+    posInTex = mod(posInTex, uWidth);
+    vec4 col = texture(uSampler, posInTex / uWidth);
     int cellVal = cellValueFromColorComponent(col[0]);
+    if (uOverlayCellIsEnabled && floor(posInTex) + vec2(0.5) == uOverlayCellPosition) {
+      cellVal = uOverlayCellValue;
+    }
     int kind = getCellKind(cellVal);
     int subKind = getCellSubKind(cellVal);
     bool signaling = (
