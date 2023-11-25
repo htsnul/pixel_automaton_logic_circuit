@@ -304,7 +304,7 @@ onload = async () => {
         <div>
           <div><label><input name="cell-kind" type="radio" value="None">None</label></div>
           <div><label><input name="cell-kind" type="radio" value="Wire" checked>Wire</label></div>
-          <div><label><input name="cell-kind" type="radio" value="Cross">Wire-X</label></div>
+          <div><label><input name="cell-kind" type="radio" value="Cross">Wire-Cross</label></div>
         </div>
         <div>
           <div><label><input name="cell-kind" type="radio" value="And">In-AND</label></div>
@@ -352,12 +352,18 @@ onload = async () => {
     const getPositionInShaderFromEvent = (event) => {
       const scale = Math.pow(2, zoomLevel);
       const canvasClientRect = canvas.getBoundingClientRect();
-      const pos = {
-        x: Math.round((event.clientX - canvasClientRect.x - 0.5 * width) / scale - position.x) + 0.5,
-        y: -Math.round((event.clientY - canvasClientRect.y - 0.5 * height) / scale + position.y) + 0.5
+      const posOnCanvas = {
+        x: event.clientX - canvasClientRect.x,
+        y: event.clientY - canvasClientRect.y
       };
+      const pos = {
+        x: Math.floor((posOnCanvas.x - 0.5 * width) / scale - position.x) + 0.5,
+        y: height - Math.floor((posOnCanvas.y - 0.5 * height) / scale + position.y) - 0.5
+      };
+      pos.x %= width;
+      pos.y %= height;
       if (pos.x < 0) pos.x += width;
-      if (pos.y < 0) pos.y += width;
+      if (pos.y < 0) pos.y += height;
       return pos;
     };
     const drawByPointerEvent = (event) => {
