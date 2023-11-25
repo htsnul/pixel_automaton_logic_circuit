@@ -19,10 +19,54 @@ const circuitFilenames = [
   "7_segment_display.json"
 ];
 let gl;
-let dummyTexture;
-let targetTextures = [];
-let targetTextureIndex = 0;
-let fbs = [];
+
+class CellTextures {
+  #textures = [];
+  #currentIndex = 0;
+  #framebuffers = [];
+  initialize(gl) {
+    for (let i = 0; i < 2; ++i) {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      const pixels = new Uint8Array(width * height);
+      for (let i = 0; i < pixels.length; ++i) {
+        pixels[i] = 0;
+      }
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.R8,
+        width, height,
+        0,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        pixels
+      );
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      const fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(
+        gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0
+      );
+      this.#textures[i] = tex;
+      this.#framebuffers[i] = fb;
+    }
+  }
+
+  get currentTexture() {
+    return this.#textures[this.#currentIndex];
+  }
+
+  get nextFramebuffer() {
+    return this.#framebuffers[1 - this.#currentIndex];
+  }
+
+  advance() {
+    this.#currentIndex = 1 - this.#currentIndex;
+  }
+}
+const cellTextures = new CellTextures();
 let buffer;
 
 let width = 512;
@@ -99,58 +143,56 @@ async function loadCircuit(filename) {
       }
     }
   }
-  for (let i = 0; i < 2; ++i) {
-    gl.bindTexture(gl.TEXTURE_2D, targetTextures[i]);
-    const pixels = new Uint8Array(width * height);
-    for (let y = 0; y < height; ++y) {
-      for (let x = 0; x < width; ++x) {
-        const cell = cells[y][x];
-        let kind = 0;
-        let subKind = 0;
-        if (cell.kind === "Wire") {
-          kind = 1;
-          subKind = 0;
-        }
-        if (cell.kind === "Cross") {
-          kind = 1;
-          subKind = 1;
-        }
-        if (cell.kind === "One") {
-          kind = 1;
-          subKind = 2;
-        }
-        if (cell.kind === "And") {
-          kind = 2;
-          subKind = 0;
-        }
-        if (cell.kind === "Or") {
-          kind = 2;
-          subKind = 1;
-        }
-        if (cell.kind === "Xor") {
-          kind = 2;
-          subKind = 2;
-        }
-        if (cell.kind === "Out") {
-          kind = 3;
-          subKind = 0;
-        }
-        if (cell.kind === "NotOut") {
-          kind = 3;
-          subKind = 1;
-        }
-        pixels[((height - y - 1) * width + x)] = (kind << 6) + (subKind << 4);
+  const pixels = new Uint8Array(width * height);
+  for (let y = 0; y < height; ++y) {
+    for (let x = 0; x < width; ++x) {
+      const cell = cells[y][x];
+      let kind = 0;
+      let subKind = 0;
+      if (cell.kind === "Wire") {
+        kind = 1;
+        subKind = 0;
       }
+      if (cell.kind === "Cross") {
+        kind = 1;
+        subKind = 1;
+      }
+      if (cell.kind === "One") {
+        kind = 1;
+        subKind = 2;
+      }
+      if (cell.kind === "And") {
+        kind = 2;
+        subKind = 0;
+      }
+      if (cell.kind === "Or") {
+        kind = 2;
+        subKind = 1;
+      }
+      if (cell.kind === "Xor") {
+        kind = 2;
+        subKind = 2;
+      }
+      if (cell.kind === "Out") {
+        kind = 3;
+        subKind = 0;
+      }
+      if (cell.kind === "NotOut") {
+        kind = 3;
+        subKind = 1;
+      }
+      pixels[((height - y - 1) * width + x)] = (kind << 6) + (subKind << 4);
     }
-    gl.texSubImage2D(
-      gl.TEXTURE_2D,
-      0, 0, 0,
-      width, height,
-      gl.RED,
-      gl.UNSIGNED_BYTE,
-      pixels
-    );
   }
+  gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
+  gl.texSubImage2D(
+    gl.TEXTURE_2D,
+    0, 0, 0,
+    width, height,
+    gl.RED,
+    gl.UNSIGNED_BYTE,
+    pixels
+  );
   frameIndex = 0;
 }
 
@@ -158,62 +200,17 @@ function initGl() {
   const canvas = document.querySelector("canvas");
   gl = canvas.getContext("webgl2");
   shaderProgram.initialize(gl);
-  dummyTexture = gl.createTexture();
-  {
-    gl.bindTexture(gl.TEXTURE_2D, dummyTexture);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      width, height,
-      0,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      null
-    );
-  }
-  for (let i = 0; i < 2; ++i) {
-    targetTextures[i] = gl.createTexture();
-    {
-      gl.bindTexture(gl.TEXTURE_2D, targetTextures[i]);
-      const pixels = new Uint8Array(width * height);
-      for (let i = 0; i < pixels.length; ++i) {
-        pixels[i] = 0;
-      }
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.R8,
-        width, height,
-        0,
-        gl.RED,
-        gl.UNSIGNED_BYTE,
-        pixels
-      );
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      fbs[i] = gl.createFramebuffer();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbs[i]);
-      const attachmentPoint = gl.COLOR_ATTACHMENT0;
-      gl.framebufferTexture2D(
-        gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, targetTextures[i], 0
-      );
-    }
-  }
+  cellTextures.initialize(gl);
   buffer = gl.createBuffer();
 }
 
 function updateGl() {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbs[targetTextureIndex]);
-  //gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, cellTextures.nextFramebuffer);
   gl.useProgram(shaderProgram.programForUpdate);
-  //gl.enableVertexAttribArray(0);
-  //gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  //gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
-  gl.bindTexture(gl.TEXTURE_2D, targetTextures[targetTextureIndex == 0 ? 1 : 0]);
+  gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
   gl.uniform1i(gl.getUniformLocation(shaderProgram.programForUpdate, "uSampler"), 0);
   gl.drawArrays(gl.POINTS, 0, 1);
-  targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
+  cellTextures.advance();
 }
 
 function renderGl() {
@@ -225,7 +222,7 @@ function renderGl() {
     gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
   }
   {
-    gl.bindTexture(gl.TEXTURE_2D, targetTextures[0]);
+    gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
     gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
     gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uWidth"), width);
     gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForRender, "uPosition"), [position.x, position.y]);
@@ -308,11 +305,11 @@ onload = async () => {
     div.querySelector("#earth-button").onclick = () => {
       shaderProgram.doEditCommand(
         gl,
-        fbs[targetTextureIndex],
-        targetTextures[targetTextureIndex == 0 ? 1 : 0],
+        cellTextures.nextFramebuffer,
+        cellTextures.currentTexture,
         "Earth"
       );
-      targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
+      cellTextures.advance();
     };
     zoom(0);
     div.querySelector("#zoom-out-button").onclick = () => zoom(-1);
@@ -360,25 +357,25 @@ onload = async () => {
       })();
       shaderProgram.doEditCommand(
         gl,
-        fbs[targetTextureIndex],
-        targetTextures[targetTextureIndex == 0 ? 1 : 0],
+        cellTextures.nextFramebuffer,
+        cellTextures.currentTexture,
         "Draw",
         pos,
         cellVal
       );
-      targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
+      cellTextures.advance();
     };
     const signalByPointerEvent = (event) => {
       const pos = getPositionInShaderFromEvent(event);
       shaderProgram.doEditCommand(
         gl,
-        fbs[targetTextureIndex],
-        targetTextures[targetTextureIndex == 0 ? 1 : 0],
+        cellTextures.nextFramebuffer,
+        cellTextures.currentTexture,
         "Signal",
         pos,
         undefined
       );
-      targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
+      cellTextures.advance();
     };
     canvas.onpointerdown = (event) => {
       isDragging = true;
