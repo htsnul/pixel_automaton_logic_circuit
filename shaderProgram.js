@@ -226,6 +226,11 @@ const fragmentShaderForRenderSource = `#version 300 es
   uniform bool uOverlayCellIsEnabled;
   uniform vec2 uOverlayCellPosition;
   uniform int uOverlayCellValue;
+  uniform bool uSelectionIsEnabled;
+  uniform vec2 uSelectionPositionMin;
+  uniform vec2 uSelectionPositionMax;
+  uniform bool uOverlayPasteIsEnabled;
+  uniform vec2 uOverlayPastePosition;
 
   out vec4 fragColor;
 
@@ -242,6 +247,69 @@ const fragmentShaderForRenderSource = `#version 300 es
     int cellVal = cellValueFromColorComponent(col[0]);
     if (uOverlayCellIsEnabled && floor(posInTex) + vec2(0.5) == uOverlayCellPosition) {
       cellVal = uOverlayCellValue;
+    }
+    if (
+      uSelectionIsEnabled &&
+      (int(posInTex.x) + int(posInTex.y)) % 2 == 0 && (
+        (
+          (
+            floor(posInTex.y) + 0.5 == uSelectionPositionMin.y ||
+            floor(posInTex.y) + 0.5 == uSelectionPositionMax.y ||
+            floor(posInTex.y + uWidth) + 0.5 == uSelectionPositionMin.y ||
+            floor(posInTex.y + uWidth) + 0.5 == uSelectionPositionMax.y
+          ) && (
+            (
+              uSelectionPositionMin.x <= floor(posInTex.x) + 0.5 &&
+              floor(posInTex.x) + 0.5 <= uSelectionPositionMax.x
+            ) || (
+              uSelectionPositionMin.x <= floor(posInTex.x + uWidth) + 0.5 &&
+              floor(posInTex.x + uWidth) + 0.5 <= uSelectionPositionMax.x
+            )
+          )
+        ) || (
+          (
+            floor(posInTex.x) + 0.5 == uSelectionPositionMin.x ||
+            floor(posInTex.x) + 0.5 == uSelectionPositionMax.x ||
+            floor(posInTex.x + uWidth) + 0.5 == uSelectionPositionMin.x ||
+            floor(posInTex.x + uWidth) + 0.5 == uSelectionPositionMax.x
+          ) && (
+            (
+              uSelectionPositionMin.y <= floor(posInTex.y) + 0.5 &&
+              floor(posInTex.y) + 0.5 <= uSelectionPositionMax.y
+            ) || (
+              uSelectionPositionMin.y <= floor(posInTex.y + uWidth) + 0.5 &&
+              floor(posInTex.y + uWidth) + 0.5 <= uSelectionPositionMax.y
+            )
+          )
+        )
+      )
+    ) {
+      cellVal = makeCellValue(CellKindWire, CellWireKindWire, true, true, true, true);
+    }
+    if (uOverlayPasteIsEnabled) {
+      vec2 size = uSelectionPositionMax - uSelectionPositionMin;
+      if (
+        (
+          (
+            uOverlayPastePosition.x <= floor(posInTex.x) + 0.5 &&
+            floor(posInTex.x) + 0.5 <= uOverlayPastePosition.x + size.x
+          ) || (
+            uOverlayPastePosition.x <= floor(posInTex.x + uWidth) + 0.5 &&
+            floor(posInTex.x + uWidth) + 0.5 <= uOverlayPastePosition.x + size.x
+          )
+        ) && (
+          (
+            uOverlayPastePosition.y <= floor(posInTex.y) + 0.5 &&
+            floor(posInTex.y) + 0.5 <= uOverlayPastePosition.y + size.y
+          ) || (
+            uSelectionPositionMin.y <= floor(posInTex.y + uWidth) + 0.5 &&
+            floor(posInTex.y + uWidth) + 0.5 <= uOverlayPastePosition.y + size.y
+          )
+        )
+      ) {
+        vec4 col = texture(uSampler, (posInTex - uOverlayPastePosition + uSelectionPositionMin) / uWidth);
+        cellVal = cellValueFromColorComponent(col[0]);
+      }
     }
     int kind = getCellKind(cellVal);
     int subKind = getCellSubKind(cellVal);

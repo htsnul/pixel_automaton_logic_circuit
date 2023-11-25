@@ -80,7 +80,9 @@ let clockIsOn = false;
 let position = { x: 0, y: 0 };
 let zoomLevel = 4.0;
 let targetZoomLevel = zoomLevel;
-let pointerPosInFragCoord = { x: 0, y: 0 };
+let pointerPosInWorld = { x: 0, y: 0 };
+let selectionPosStartInWorld = { x: 0, y: 0 };
+let selectionPosEndInWorld = { x: 0, y: 0 };
 let isDragging = false;
 
 let restFrameCountToUpdate = 0;
@@ -242,9 +244,10 @@ function renderGl() {
         isOverlayCellEnabled
       );
       if (isOverlayCellEnabled) {
+        const pointerPosInTexCoord = positionInWorldToTexCoord(pointerPosInWorld);
         gl.uniform2fv(
           gl.getUniformLocation(shaderProgram.programForRender, "uOverlayCellPosition"),
-          [pointerPosInFragCoord.x, pointerPosInFragCoord.y]
+          [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
         );
         const cellValue = (() => {
           if (pointerActionKind === "Draw") {
@@ -259,9 +262,57 @@ function renderGl() {
         );
       }
     }
-    zoomLevel += (targetZoomLevel - zoomLevel) / 8;
-    if (Math.abs(zoomLevel - targetZoomLevel) < 1 / 256) {
-      zoomLevel = targetZoomLevel;
+    {
+      const pointerActionKind = getCurrentPointerActionKind();
+      const isSelectionEnabled = (
+        pointerActionKind === "Select" ||
+        pointerActionKind === "Paste"
+      );
+      gl.uniform1i(
+        gl.getUniformLocation(shaderProgram.programForRender, "uSelectionIsEnabled"),
+        isSelectionEnabled
+      );
+      if (isSelectionEnabled) {
+        const selectionPosMinInWorld = {
+          x: Math.min(selectionPosStartInWorld.x, selectionPosEndInWorld.x),
+          y: Math.min(selectionPosStartInWorld.y, selectionPosEndInWorld.y)
+        };
+        const selectionPosMaxInWorld = {
+          x: Math.max(selectionPosStartInWorld.x, selectionPosEndInWorld.x),
+          y: Math.max(selectionPosStartInWorld.y, selectionPosEndInWorld.y)
+        };
+        const selectionPosMinInTexCoord = positionInWorldToTexCoord(selectionPosMinInWorld);
+        const selectionPosMaxInTexCoord = positionInWorldToTexCoord(selectionPosMaxInWorld);
+        if (selectionPosMaxInTexCoord.x < selectionPosMinInTexCoord.x) {
+          selectionPosMaxInTexCoord.x += width;
+        }
+        if (selectionPosMaxInTexCoord.y < selectionPosMinInTexCoord.y) {
+          selectionPosMaxInTexCoord.y += height;
+        }
+        gl.uniform2fv(
+          gl.getUniformLocation(shaderProgram.programForRender, "uSelectionPositionMin"),
+          [selectionPosMinInTexCoord.x, selectionPosMinInTexCoord.y]
+        );
+        gl.uniform2fv(
+          gl.getUniformLocation(shaderProgram.programForRender, "uSelectionPositionMax"),
+          [selectionPosMaxInTexCoord.x, selectionPosMaxInTexCoord.y]
+        );
+      }
+    }
+    {
+      const pointerActionKind = getCurrentPointerActionKind();
+      const isOverlayPasteEnabled = pointerActionKind === "Paste";
+      gl.uniform1i(
+        gl.getUniformLocation(shaderProgram.programForRender, "uOverlayPasteIsEnabled"),
+        isOverlayPasteEnabled
+      );
+      if (isOverlayPasteEnabled) {
+        const pointerPosInTexCoord = positionInWorldToTexCoord(pointerPosInWorld);
+        gl.uniform2fv(
+          gl.getUniformLocation(shaderProgram.programForRender, "uOverlayPastePosition"),
+          [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
+        );
+      }
     }
     const scale = Math.pow(2, zoomLevel);
     gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uScale"), scale);
@@ -314,10 +365,37 @@ function getCurrentCellValue() {
   return cellValueFromCellSerialKind(getCurrentCellSerialKind());
 }
 
+function positionInCanvasToWorld(posInCanvas) {
+  const scale = Math.pow(2, zoomLevel);
+  return {
+    x: (posInCanvas.x - 0.5 * width) / scale - position.x,
+    y: height - (posInCanvas.y - 0.5 * height) / scale - position.y
+  };
+}
+
+function positionInWorldToTexCoord(pos) {
+  const mod = (x, y) => x - y * Math.floor(x / y);
+  return {
+    x: Math.floor(mod(pos.x, width)) + 0.5,
+    y: Math.floor(mod(pos.y, height)) + 0.5
+  };
+}
+
 onload = async () => {
   {
     const style = document.createElement("style");
     style.innerHTML = `
+      .control-panel {
+        display: flex;
+        align-items: center;
+      }
+      .control-panel button {
+        box-sizing: border-box;
+        width: 24px;
+        height: 24px;
+        padding: 2px;
+        margin: 2px;
+      }
       input[type="radio"] {
         display: none;
       }
@@ -341,10 +419,10 @@ onload = async () => {
   {
     const div = document.createElement("div");
     div.innerHTML = `
-      <div style="display: flex; align-items: end; margin: 8px;">
+      <div class="control-panel">
         <div style="margin: 8px;">
           <button id="zoom-out-button"><img src="icon/minus_icon.svg"></button>
-          <span id="zoom-ratio" style="display: inline-block; width: 32px; text-align: center;"></span>
+          <span id="zoom-ratio" style="display: inline-block; width: 24px; text-align: center;"></span>
           <button id="zoom-in-button"><img src="icon/plus_icon.svg"></button>
         </div>
         <div style="margin: 8px;">
@@ -367,6 +445,8 @@ onload = async () => {
         <div style="margin: 8px;">
           <button id="earth-button" title="Earth GND"><img src="icon/earth_icon.svg"></button>
         </div>
+      </div>
+      <div class="control-panel">
         <div style="display: flex; margin: 8px;">
           <div><label title="Scroll">
             <input name="pointer-action-kind" type="radio" value="Scroll" checked>
@@ -375,6 +455,14 @@ onload = async () => {
           <div><label title="Draw">
             <input name="pointer-action-kind" type="radio" value="Draw">
             <img src="icon/draw_icon.svg">
+          </label></div>
+          <div><label title="Select">
+            <input name="pointer-action-kind" type="radio" value="Select">
+            <img src="icon/select_icon.svg">
+          </label></div>
+          <div><label title="Paste">
+            <input name="pointer-action-kind" type="radio" value="Paste">
+            <img src="icon/paste_icon.svg">
           </label></div>
           <div><label title="Signal">
             <input name="pointer-action-kind" type="radio" value="Signal">
@@ -452,46 +540,36 @@ onload = async () => {
     canvas.height = height;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
-    const getPositionInFragCoordFromEvent = (event) => {
-      const scale = Math.pow(2, zoomLevel);
+    const getPositionInCanvasFromEvent = (event) => {
       const canvasClientRect = canvas.getBoundingClientRect();
-      const posOnCanvas = {
+      return {
         x: event.clientX - canvasClientRect.x,
         y: event.clientY - canvasClientRect.y
       };
-      const pos = {
-        x: Math.floor((posOnCanvas.x - 0.5 * width) / scale - position.x) + 0.5,
-        y: height - Math.floor((posOnCanvas.y - 0.5 * height) / scale + position.y) - 0.5
-      };
-      pos.x %= width;
-      pos.y %= height;
-      if (pos.x < 0) pos.x += width;
-      if (pos.y < 0) pos.y += height;
-      return pos;
-    };
-    const drawByPointerEvent = (event) => {
-      shaderProgram.doEditCommand(
-        gl,
-        cellTextures.nextFramebuffer,
-        cellTextures.currentTexture,
-        "Draw",
-        getPositionInFragCoordFromEvent(event),
-        getCurrentCellValue()
-      );
-      cellTextures.advance();
     };
     canvas.onpointerdown = (event) => {
       isDragging = true;
-      pointerPosInFragCoord = getPositionInFragCoordFromEvent(event);
       canvas.setPointerCapture(event.pointerId);
+      pointerPosInWorld = positionInCanvasToWorld(getPositionInCanvasFromEvent(event));
       const pointerActionKind = getCurrentPointerActionKind();
       if (pointerActionKind === "Draw") {
-        drawByPointerEvent(event);
+        shaderProgram.doEditCommand(
+          gl,
+          cellTextures.nextFramebuffer,
+          cellTextures.currentTexture,
+          "Draw",
+          positionInWorldToTexCoord(pointerPosInWorld),
+          getCurrentCellValue()
+        );
+        cellTextures.advance();
+      } else if (pointerActionKind === "Select") {
+        selectionPosStartInWorld = pointerPosInWorld;
+        selectionPosEndInWorld = pointerPosInWorld;
       }
       event.preventDefault();
     }
     canvas.onpointermove = (event) => {
-      pointerPosInFragCoord = getPositionInFragCoordFromEvent(event);
+      pointerPosInWorld = positionInCanvasToWorld(getPositionInCanvasFromEvent(event));
       if (!isDragging) {
         return;
       }
@@ -501,14 +579,27 @@ onload = async () => {
         position.x += event.movementX / scale;
         position.y -= event.movementY / scale;
       } else if (pointerActionKind === "Draw") {
-        drawByPointerEvent(event);
+        shaderProgram.doEditCommand(
+          gl,
+          cellTextures.nextFramebuffer,
+          cellTextures.currentTexture,
+          "Draw",
+          positionInWorldToTexCoord(pointerPosInWorld),
+          getCurrentCellValue()
+        );
+        cellTextures.advance();
+      } else if (pointerActionKind === "Select") {
+        selectionPosEndInWorld = pointerPosInWorld;
       }
       event.preventDefault();
     }
     canvas.onpointerup = (event) => {
-      pointerPosInFragCoord = getPositionInFragCoordFromEvent(event);
+      pointerPosInWorld = positionInCanvasToWorld(getPositionInCanvasFromEvent(event));
       if (!isDragging) {
         return;
+      }
+      if (getCurrentPointerActionKind() === "Select") {
+        selectionPosEndInWorld = pointerPosInWorld;
       }
       isDragging = false;
       event.preventDefault();
@@ -675,10 +766,16 @@ function update() {
         cellTextures.nextFramebuffer,
         cellTextures.currentTexture,
         "Signal",
-        pointerPosInFragCoord,
+        positionInWorldToTexCoord(pointerPosInWorld),
         undefined
       );
       cellTextures.advance();
+    }
+  }
+  {
+    zoomLevel += (targetZoomLevel - zoomLevel) / 8;
+    if (Math.abs(zoomLevel - targetZoomLevel) < 1 / 256) {
+      zoomLevel = targetZoomLevel;
     }
   }
   if (0) {
