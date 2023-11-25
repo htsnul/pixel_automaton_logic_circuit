@@ -269,51 +269,108 @@ function getCurrentCellKind() {
 
 onload = async () => {
   {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      input[type="radio"] {
+        display: none;
+      }
+      label:has(input[type="radio"]) {
+        display: block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid transparent;
+        border-radius: 3px;
+      }
+      label:has(input[type="radio"]) > img {
+        display: block;
+        margin: 2px;
+      }
+      label:has(input[type="radio"]:checked) {
+        border-color: #888;
+      }
+    `;
+    document.head.append(style);
+  }
+  {
     const div = document.createElement("div");
     div.innerHTML = `
       <div style="display: flex; align-items: end; margin: 8px;">
-        <div>
-          <button id="zoom-out-button">-</button>
-          <span id="zoom-ratio" style="display: inline-block; width: 16px; text-align: center;"></span>
-          <button id="zoom-in-button">+</button>
+        <div style="margin: 8px;">
+          <button id="zoom-out-button"><img src="icon/minus_icon.svg"></button>
+          <span id="zoom-ratio" style="display: inline-block; width: 32px; text-align: center;"></span>
+          <button id="zoom-in-button"><img src="icon/plus_icon.svg"></button>
         </div>
-        <div>
+        <div style="margin: 8px;">
           <select id="hz-select">
+            <option value="0">0Hz</option>
             <option value="1">1Hz</option>
             <option value="3">3Hz</option>
             <option value="6">6Hz</option>
-            <option value="10">10Hz</option>
+            <option value="12">12Hz</option>
             <option value="30">30Hz</option>
             <option value="60" selected>60Hz</option>
-            <option value="100">100Hz</option>
+            <option value="120">120Hz</option>
             <option value="300">300Hz</option>
             <option value="600">600Hz</option>
-            <option value="1000">1KHz</option>
-            <option value="3000">3KHz</option>
-            <option value="6000">6KHz</option>
+            <option value="1200">1.2KHz</option>
+            <option value="3000">3.0KHz</option>
+            <option value="6000">6.0KHz</option>
           </select>
         </div>
-        <div>
-          <button id="earth-button">Earth</button>
+        <div style="margin: 8px;">
+          <button id="earth-button" title="Earth GND"><img src="icon/earth_icon.svg"></button>
         </div>
-        <div>
-          <div><label><input name="pointer-action-kind" type="radio" value="Scroll" checked>Scroll</label></div>
-          <div><label><input name="pointer-action-kind" type="radio" value="Draw">Draw</label></div>
-          <div><label><input name="pointer-action-kind" type="radio" value="Signal">Signal</label></div>
+        <div style="display: flex; margin: 8px;">
+          <div><label title="Scroll">
+            <input name="pointer-action-kind" type="radio" value="Scroll" checked>
+            <img src="icon/scroll_icon.svg">
+          </label></div>
+          <div><label title="Draw">
+            <input name="pointer-action-kind" type="radio" value="Draw">
+            <img src="icon/draw_icon.svg">
+          </label></div>
+          <div><label title="Signal">
+            <input name="pointer-action-kind" type="radio" value="Signal">
+            <img src="icon/signal_icon.svg">
+          </label></div>
         </div>
-        <div>
-          <div><label><input name="cell-kind" type="radio" value="None">None</label></div>
-          <div><label><input name="cell-kind" type="radio" value="Wire" checked>Wire</label></div>
-          <div><label><input name="cell-kind" type="radio" value="Cross">Wire-Cross</label></div>
+        <div style="display: flex; margin: 8px;">
+          <div><label title="None">
+            <input name="cell-kind" type="radio" value="None">
+            <img src="icon/none_icon.svg">
+          </label></div>
+          <div><label title="Wire">
+            <input name="cell-kind" type="radio" value="Wire" checked>
+            <img src="icon/wire_icon.svg">
+          </label></div>
+          <div><label title="Wire-Cross">
+            <input name="cell-kind" type="radio" value="Cross">
+            <img src="icon/wire_cross_icon.svg">
+          </label></div>
         </div>
-        <div>
-          <div><label><input name="cell-kind" type="radio" value="And">In-AND</label></div>
-          <div><label><input name="cell-kind" type="radio" value="Or">In-OR</label></div>
-          <div><label><input name="cell-kind" type="radio" value="Xor">In-XOR</label></div>
+        <div style="display: flex; margin: 8px;">
+          <div><label title="In-AND">
+            <input name="cell-kind" type="radio" value="And">
+            <img src="icon/in_and_icon.svg">
+          </label></div>
+          <div><label title="In-OR">
+            <input name="cell-kind" type="radio" value="Or">
+            <img src="icon/in_or_icon.svg">
+          </label></div>
+          <div><label title="In-XOR">
+            <input name="cell-kind" type="radio" value="Xo">
+            <img src="icon/in_xor_icon.svg">
+          </label></div>
         </div>
-        <div>
-          <div><label><input name="cell-kind" type="radio" value="Out">Out</label></div>
-          <div><label><input name="cell-kind" type="radio" value="InvOut">Out-NOT</label></div>
+        <div style="display: flex; margin: 8px;">
+          <div><label title="Out">
+            <input name="cell-kind" type="radio" value="Out">
+            <img src="icon/out_icon.svg">
+            </label></div>
+          <div><label title="Out-NOT">
+            <input name="cell-kind" type="radio" value="InvOut">
+            <img src="icon/out_not_icon.svg">
+          </label></div>
         </div>
       <div>
     `;
@@ -321,7 +378,7 @@ onload = async () => {
       if (zoom !== 0) {
         targetZoomLevel = Math.min(Math.max(0, targetZoomLevel + sign), 6);
       }
-      div.querySelector("#zoom-ratio").innerHTML = Math.pow(2, targetZoomLevel);
+      div.querySelector("#zoom-ratio").innerHTML = "x" + Math.pow(2, targetZoomLevel);
     };
     div.querySelector("#earth-button").onclick = () => {
       shaderProgram.doEditCommand(
@@ -552,12 +609,15 @@ function update() {
   if (hz >= 60) {
     updateCount = Math.max(1, hz / 60);
     restFrameCountToUpdate = 0;
-  } else {
+  } else if (hz > 0) {
     if (restFrameCountToUpdate <= 0) {
       updateCount = 1;
       restFrameCountToUpdate = 60 / hz;
     }
     restFrameCountToUpdate--;
+  } else {
+    updateCount = 0;
+    restFrameCountToUpdate = 0;
   }
   if (0) for (let i = 0; i < updateCount; ++i) {
     if (circuitData) {
