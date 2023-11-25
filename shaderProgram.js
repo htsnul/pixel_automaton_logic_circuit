@@ -168,7 +168,12 @@ const fragmentShaderForUpdateSource = `#version 300 es
 const fragmentShaderForEditSource = `#version 300 es
   precision mediump float;
 
+  int CommandKindDraw = 0;
+  int CommandKindEarth = 1;
+  int CommandKindSignal = 2;
+
   uniform sampler2D uSampler;
+  uniform int uCommandKind;
   uniform vec2 uPosition;
   uniform int uCellValue;
   out vec4 fragColor;
@@ -179,8 +184,32 @@ const fragmentShaderForEditSource = `#version 300 es
     const float texW = 512.0f;
     vec4 col = texture(uSampler, gl_FragCoord.xy / texW);
     int cellVal = cellValueFromColorComponent(col[0]);
-    if (gl_FragCoord.xy != uPosition) {
-      fragColor[0] = cellValueToColorComponent(cellVal);
+    if (uCommandKind == CommandKindDraw) {
+      if (gl_FragCoord.xy != uPosition) {
+        fragColor[0] = cellValueToColorComponent(cellVal);
+        return;
+      }
+      fragColor[0] = cellValueToColorComponent(uCellValue);
+      return;
+    }
+    if (uCommandKind == CommandKindEarth) {
+      int kind = getCellKind(cellVal);
+      int subKind = getCellSubKind(cellVal);
+      fragColor[0] = cellValueToColorComponent(makeCellValue(
+        kind, subKind, false, false, false, false
+      ));
+      return;
+    }
+    if (uCommandKind == CommandKindSignal) {
+      if (gl_FragCoord.xy != uPosition) {
+        fragColor[0] = cellValueToColorComponent(cellVal);
+        return;
+      }
+      int kind = getCellKind(cellVal);
+      int subKind = getCellSubKind(cellVal);
+      fragColor[0] = cellValueToColorComponent(makeCellValue(
+        kind, subKind, true, true, true, true
+      ));
       return;
     }
     fragColor[0] = cellValueToColorComponent(uCellValue);
@@ -265,6 +294,25 @@ class ShaderProgram {
       fragmentShaderForRenderSource
     );
   }
+  doEditCommand(gl, fb, tex, kind, pos, cellVal) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.useProgram(this.programForEdit);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    const kindInt = (() => {
+      switch (kind) {
+        case "Draw": return 0;
+        case "Earth": return 1;
+        case "Signal": return 2;
+      }
+    })();
+    gl.uniform1i(gl.getUniformLocation(this.programForEdit, "uSampler"), 0);
+    gl.uniform1i(gl.getUniformLocation(this.programForEdit, "uCommandKind"), kindInt);
+    if (pos) {
+      gl.uniform2fv(gl.getUniformLocation(this.programForEdit, "uPosition"), [pos.x, pos.y]);
+    }
+    gl.uniform1i(gl.getUniformLocation(this.programForEdit, "uCellValue"), cellVal);
+    gl.drawArrays(gl.POINTS, 0, 1);
+  };
   #createProgram(gl, vertexShaderSource, fragmentShaderSource) {
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
     gl.shaderSource(vertexShader, vertexShaderSource);

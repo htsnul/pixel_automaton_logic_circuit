@@ -33,7 +33,7 @@ let frameIndex = 0;
 let clockIsOn = false;
 
 let position = { x: 0, y: 0 };
-let zoomLevel = 2.0;
+let zoomLevel = 4.0;
 let targetZoomLevel = zoomLevel;
 
 function makeCell(kind, pushingTo) {
@@ -271,26 +271,48 @@ onload = async () => {
   {
     const div = document.createElement("div");
     div.innerHTML = `
-      <label><input name="pointer-action-kind" type="radio" value="Scroll">Scroll</label>
-      <label><input name="pointer-action-kind" type="radio" value="Draw" checked>Draw</label>
-      <label><input name="cell-kind" type="radio" value="None">None</label>
-      <label><input name="cell-kind" type="radio" value="Wire" checked>Wire</label>
-      <label><input name="cell-kind" type="radio" value="Cross">Cross</label>
-      <label><input name="cell-kind" type="radio" value="One">1</label>
-      <label><input name="cell-kind" type="radio" value="And">AND</label>
-      <label><input name="cell-kind" type="radio" value="Or">OR</label>
-      <label><input name="cell-kind" type="radio" value="Xor">XOR</label>
-      <label><input name="cell-kind" type="radio" value="Out">Out</label>
-      <label><input name="cell-kind" type="radio" value="InvOut">Inv-Out</label>
-      <button id="zoom-out-button">-</button>
-      <input id="zoom-ratio" disabled style="width: 50px;">
-      <button id="zoom-in-button">+</button>
+      <div style="display: flex; align-items: end; margin: 8px;">
+        <div>
+          <button id="zoom-out-button">-</button>
+          <span id="zoom-ratio" style="display: inline-block; width: 16px; text-align: center;"></span>
+          <button id="zoom-in-button">+</button>
+        </div>
+        <div>
+          <div><label><input name="pointer-action-kind" type="radio" value="Scroll" checked>Scroll</label></div>
+          <div><label><input name="pointer-action-kind" type="radio" value="Draw">Draw</label></div>
+          <div><label><input name="pointer-action-kind" type="radio" value="Signal">Signal</label></div>
+          <div><button id="earth-button">Earth</button></div>
+        </div>
+        <div>
+          <div><label><input name="cell-kind" type="radio" value="None">None</label></div>
+          <div><label><input name="cell-kind" type="radio" value="Wire" checked>Wire</label></div>
+          <div><label><input name="cell-kind" type="radio" value="Cross">Wire-X</label></div>
+        </div>
+        <div>
+          <div><label><input name="cell-kind" type="radio" value="And">In-AND</label></div>
+          <div><label><input name="cell-kind" type="radio" value="Or">In-OR</label></div>
+          <div><label><input name="cell-kind" type="radio" value="Xor">In-XOR</label></div>
+        </div>
+        <div>
+          <div><label><input name="cell-kind" type="radio" value="Out">Out</label></div>
+          <div><label><input name="cell-kind" type="radio" value="InvOut">Out-NOT</label></div>
+        </div>
+      <div>
     `;
     const zoom = (sign) => {
       if (zoom !== 0) {
-        targetZoomLevel = Math.min(Math.max(0, targetZoomLevel + sign), 4);
+        targetZoomLevel = Math.min(Math.max(0, targetZoomLevel + sign), 6);
       }
-      div.querySelector("#zoom-ratio").value = 100 * Math.pow(2, targetZoomLevel) + "%";
+      div.querySelector("#zoom-ratio").innerHTML = Math.pow(2, targetZoomLevel);
+    };
+    div.querySelector("#earth-button").onclick = () => {
+      shaderProgram.doEditCommand(
+        gl,
+        fbs[targetTextureIndex],
+        targetTextures[targetTextureIndex == 0 ? 1 : 0],
+        "Earth"
+      );
+      targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
     };
     zoom(0);
     div.querySelector("#zoom-out-button").onclick = () => zoom(-1);
@@ -309,12 +331,8 @@ onload = async () => {
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     let isDragging = false;
-    const drawByPointerEvent = (event) => {
+    const getPositionInShaderFromEvent = (event) => {
       const scale = Math.pow(2, zoomLevel);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbs[targetTextureIndex]);
-      gl.useProgram(shaderProgram.programForEdit);
-      gl.bindTexture(gl.TEXTURE_2D, targetTextures[targetTextureIndex == 0 ? 1 : 0]);
-      gl.uniform1i(gl.getUniformLocation(shaderProgram.programForEdit, "uSampler"), 0);
       const canvasClientRect = canvas.getBoundingClientRect();
       const pos = {
         x: Math.round((event.clientX - canvasClientRect.x - 0.5 * width) / scale - position.x) + 0.5,
@@ -322,8 +340,11 @@ onload = async () => {
       };
       if (pos.x < 0) pos.x += width;
       if (pos.y < 0) pos.y += width;
-      gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForEdit, "uPosition"), [pos.x, pos.y]);
-      const cellValue = (() => {
+      return pos;
+    };
+    const drawByPointerEvent = (event) => {
+      const pos = getPositionInShaderFromEvent(event);
+      const cellVal = (() => {
         const cellKind = getCurrentCellKind();
         switch (cellKind) {
           case "None": return (0 << 6) + (0 << 4);
@@ -337,8 +358,26 @@ onload = async () => {
           case "InvOut": return (3 << 6) + (1 << 4);
         }
       })();
-      gl.uniform1i(gl.getUniformLocation(shaderProgram.programForEdit, "uCellValue"), cellValue);
-      gl.drawArrays(gl.POINTS, 0, 1);
+      shaderProgram.doEditCommand(
+        gl,
+        fbs[targetTextureIndex],
+        targetTextures[targetTextureIndex == 0 ? 1 : 0],
+        "Draw",
+        pos,
+        cellVal
+      );
+      targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
+    };
+    const signalByPointerEvent = (event) => {
+      const pos = getPositionInShaderFromEvent(event);
+      shaderProgram.doEditCommand(
+        gl,
+        fbs[targetTextureIndex],
+        targetTextures[targetTextureIndex == 0 ? 1 : 0],
+        "Signal",
+        pos,
+        undefined
+      );
       targetTextureIndex = targetTextureIndex == 0 ? 1 : 0;
     };
     canvas.onpointerdown = (event) => {
@@ -347,6 +386,8 @@ onload = async () => {
       const pointerActionKind = getCurrentPointerActionKind();
       if (pointerActionKind === "Draw") {
         drawByPointerEvent(event);
+      } else if (pointerActionKind === "Signal") {
+        signalByPointerEvent(event);
       }
       event.preventDefault();
     }
@@ -361,6 +402,8 @@ onload = async () => {
         position.y -= event.movementY / scale;
       } else if (pointerActionKind === "Draw") {
         drawByPointerEvent(event);
+      } else if (pointerActionKind === "Signal") {
+        signalByPointerEvent(event);
       }
       event.preventDefault();
     }
