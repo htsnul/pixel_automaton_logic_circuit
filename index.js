@@ -66,6 +66,7 @@ class CellTextures {
     this.#currentIndex = 1 - this.#currentIndex;
   }
 }
+
 const cellTextures = new CellTextures();
 let buffer;
 
@@ -79,6 +80,8 @@ let clockIsOn = false;
 let position = { x: 0, y: 0 };
 let zoomLevel = 4.0;
 let targetZoomLevel = zoomLevel;
+
+let restFrameCountToUpdate = 0;
 
 function makeCell(kind, pushingTo) {
   return { kind, pushingTo };
@@ -275,10 +278,28 @@ onload = async () => {
           <button id="zoom-in-button">+</button>
         </div>
         <div>
+          <select id="hz-select">
+            <option value="1">1Hz</option>
+            <option value="3">3Hz</option>
+            <option value="6">6Hz</option>
+            <option value="10">10Hz</option>
+            <option value="30">30Hz</option>
+            <option value="60" selected>60Hz</option>
+            <option value="100">100Hz</option>
+            <option value="300">300Hz</option>
+            <option value="600">600Hz</option>
+            <option value="1000">1KHz</option>
+            <option value="3000">3KHz</option>
+            <option value="6000">6KHz</option>
+          </select>
+        </div>
+        <div>
+          <button id="earth-button">Earth</button>
+        </div>
+        <div>
           <div><label><input name="pointer-action-kind" type="radio" value="Scroll" checked>Scroll</label></div>
           <div><label><input name="pointer-action-kind" type="radio" value="Draw">Draw</label></div>
           <div><label><input name="pointer-action-kind" type="radio" value="Signal">Signal</label></div>
-          <div><button id="earth-button">Earth</button></div>
         </div>
         <div>
           <div><label><input name="cell-kind" type="radio" value="None">None</label></div>
@@ -519,9 +540,20 @@ function renderCell(imageData, x, y, cell) {
 }
 
 function update() {
-  //setTimeout(() => requestAnimationFrame(update), 500);
   requestAnimationFrame(update);
-  for (let i = 0; i < 0; ++i) {
+  const hz = Number(document.querySelector("#hz-select > option:checked").value);
+  let updateCount = 0;
+  if (hz >= 60) {
+    updateCount = Math.max(1, hz / 60);
+    restFrameCountToUpdate = 0;
+  } else {
+    if (restFrameCountToUpdate <= 0) {
+      updateCount = 1;
+      restFrameCountToUpdate = 60 / hz;
+    }
+    restFrameCountToUpdate--;
+  }
+  if (0) for (let i = 0; i < updateCount; ++i) {
     if (circuitData) {
       const cycleCount = circuitData.cycleCount;
       const inputCount = circuitData.inputCount;
@@ -548,7 +580,7 @@ function update() {
       }
     }
   }
-  for (let i = 0; i < 1; ++i) {
+  for (let i = 0; i < updateCount; ++i) {
     updateGl();
   }
   if (0) {
