@@ -228,8 +228,8 @@ const fragmentShaderForRenderSource = `#version 300 es
   uniform vec2 uOverlayCellPosition;
   uniform int uOverlayCellValue;
   uniform bool uSelectionIsEnabled;
-  uniform vec2 uSelectionPositionMin;
-  uniform vec2 uSelectionPositionMax;
+  uniform vec2 uSelectionRectPosition;
+  uniform vec2 uSelectionRectSize;
   uniform bool uOverlayPasteIsEnabled;
   uniform vec2 uOverlayPastePosition;
 
@@ -249,37 +249,39 @@ const fragmentShaderForRenderSource = `#version 300 es
     if (uOverlayCellIsEnabled && floor(posInTex) + vec2(0.5) == uOverlayCellPosition) {
       cellVal = uOverlayCellValue;
     }
+    vec2 selectionRectBegin = uSelectionRectPosition;
+    vec2 selectionRectEnd = uSelectionRectPosition + uSelectionRectSize;
     if (
       uSelectionIsEnabled &&
       (int(posInTex.x) + int(posInTex.y)) % 2 == 0 && (
         (
           (
-            floor(posInTex.y) + 0.5 == uSelectionPositionMin.y ||
-            floor(posInTex.y) + 0.5 == uSelectionPositionMax.y ||
-            floor(posInTex.y + uWidth) + 0.5 == uSelectionPositionMin.y ||
-            floor(posInTex.y + uWidth) + 0.5 == uSelectionPositionMax.y
+            floor(posInTex.y) == selectionRectBegin.y ||
+            ceil(posInTex.y) == selectionRectEnd.y ||
+            floor(posInTex.y + uWidth) == selectionRectBegin.y ||
+            ceil(posInTex.y + uWidth) == selectionRectEnd.y
           ) && (
             (
-              uSelectionPositionMin.x <= floor(posInTex.x) + 0.5 &&
-              floor(posInTex.x) + 0.5 <= uSelectionPositionMax.x
+              selectionRectBegin.x <= posInTex.x &&
+              posInTex.x <= selectionRectEnd.x
             ) || (
-              uSelectionPositionMin.x <= floor(posInTex.x + uWidth) + 0.5 &&
-              floor(posInTex.x + uWidth) + 0.5 <= uSelectionPositionMax.x
+              selectionRectBegin.x <= posInTex.x + uWidth &&
+              posInTex.x + uWidth <= selectionRectEnd.x
             )
           )
         ) || (
           (
-            floor(posInTex.x) + 0.5 == uSelectionPositionMin.x ||
-            floor(posInTex.x) + 0.5 == uSelectionPositionMax.x ||
-            floor(posInTex.x + uWidth) + 0.5 == uSelectionPositionMin.x ||
-            floor(posInTex.x + uWidth) + 0.5 == uSelectionPositionMax.x
+            floor(posInTex.x) == selectionRectBegin.x ||
+            ceil(posInTex.x) == selectionRectEnd.x ||
+            floor(posInTex.x + uWidth) == selectionRectBegin.x ||
+            ceil(posInTex.x + uWidth) == selectionRectEnd.x
           ) && (
             (
-              uSelectionPositionMin.y <= floor(posInTex.y) + 0.5 &&
-              floor(posInTex.y) + 0.5 <= uSelectionPositionMax.y
+              selectionRectBegin.y <= posInTex.y &&
+              posInTex.y <= selectionRectEnd.y
             ) || (
-              uSelectionPositionMin.y <= floor(posInTex.y + uWidth) + 0.5 &&
-              floor(posInTex.y + uWidth) + 0.5 <= uSelectionPositionMax.y
+              selectionRectBegin.y <= posInTex.y + uWidth &&
+              posInTex.y + uWidth <= selectionRectEnd.y
             )
           )
         )
@@ -288,7 +290,7 @@ const fragmentShaderForRenderSource = `#version 300 es
       cellVal = makeCellValue(CellKindWire, CellWireKindWire, true, true, true, true);
     }
     if (uOverlayPasteIsEnabled) {
-      vec2 size = uSelectionPositionMax - uSelectionPositionMin;
+      vec2 size = uSelectionRectSize;
       if (
         (
           (
@@ -303,7 +305,7 @@ const fragmentShaderForRenderSource = `#version 300 es
             uOverlayPastePosition.y <= floor(posInTex.y) + 0.5 &&
             floor(posInTex.y) + 0.5 <= uOverlayPastePosition.y + size.y
           ) || (
-            uSelectionPositionMin.y <= floor(posInTex.y + uWidth) + 0.5 &&
+            uOverlayPastePosition.y <= floor(posInTex.y + uWidth) + 0.5 &&
             floor(posInTex.y + uWidth) + 0.5 <= uOverlayPastePosition.y + size.y
           )
         )

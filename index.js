@@ -337,21 +337,13 @@ function renderGl() {
         const selectionRect = getRectInTexCoordFromPositionStartEnd(
           selectionPosStartInWorld, selectionPosEndInWorld
         );
-        const selectionPosMin = {
-          x: selectionRect.x + 0.5,
-          y: selectionRect.y + 0.5
-        };
-        const selectionPosMax = {
-          x: selectionRect.x + selectionRect.width - 0.5,
-          y: selectionRect.y + selectionRect.height - 0.5
-        };
         gl.uniform2fv(
-          gl.getUniformLocation(shaderProgram.programForRender, "uSelectionPositionMin"),
-          [selectionPosMin.x, selectionPosMin.y]
+          gl.getUniformLocation(shaderProgram.programForRender, "uSelectionRectPosition"),
+          [selectionRect.x, selectionRect.y]
         );
         gl.uniform2fv(
-          gl.getUniformLocation(shaderProgram.programForRender, "uSelectionPositionMax"),
-          [selectionPosMax.x, selectionPosMax.y]
+          gl.getUniformLocation(shaderProgram.programForRender, "uSelectionRectSize"),
+          [selectionRect.width, selectionRect.height]
         );
       }
     }
