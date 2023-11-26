@@ -610,7 +610,8 @@ onload = async () => {
         gl,
         cellTextures.nextFramebuffer,
         cellTextures.currentTexture,
-        "Earth"
+        "Earth",
+        {}
       );
       cellTextures.advance();
     };
