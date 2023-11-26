@@ -171,11 +171,15 @@ const fragmentShaderForEditSource = `#version 300 es
   int CommandKindDraw = 0;
   int CommandKindEarth = 1;
   int CommandKindSignal = 2;
+  int CommandKindPaste = 3;
 
   uniform sampler2D uSampler;
+  uniform sampler2D uClipboardSampler;
   uniform int uCommandKind;
   uniform vec2 uPosition;
+  uniform vec2 uSize;
   uniform int uCellValue;
+
   out vec4 fragColor;
 
   ${commonUtilSource}
@@ -212,7 +216,24 @@ const fragmentShaderForEditSource = `#version 300 es
       ));
       return;
     }
-    fragColor[0] = cellValueToColorComponent(uCellValue);
+    if (uCommandKind == CommandKindPaste) {
+      if (
+        (
+          (uPosition.x <= gl_FragCoord.x && gl_FragCoord.x < uPosition.x + uSize.x) ||
+          (uPosition.x <= gl_FragCoord.x + texW && gl_FragCoord.x + texW < uPosition.x + uSize.x)
+        ) && (
+          (uPosition.y <= gl_FragCoord.y && gl_FragCoord.y < uPosition.y + uSize.y) ||
+          (uPosition.y <= gl_FragCoord.y + texW && gl_FragCoord.y + texW < uPosition.y + uSize.y)
+        )
+      ) {
+        vec4 col = texture(uClipboardSampler, (gl_FragCoord.xy - uPosition) / texW);
+        int cellVal = cellValueFromColorComponent(col[0]);
+        fragColor[0] = cellValueToColorComponent(cellVal);
+        return;
+      }
+      fragColor[0] = cellValueToColorComponent(cellVal);
+      return;
+    }
   }
 `;
 
@@ -374,7 +395,10 @@ class ShaderProgram {
       fragmentShaderForRenderSource
     );
   }
-  doEditCommand(gl, fb, tex, kind, pos, cellVal) {
+  doEditCommand(
+    gl, fb, tex, kind,
+    { position, size, cellValue, clipboardTexture }
+  ) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
     gl.useProgram(this.programForEdit);
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -383,14 +407,26 @@ class ShaderProgram {
         case "Draw": return 0;
         case "Earth": return 1;
         case "Signal": return 2;
+        case "Paste": return 3;
       }
     })();
     gl.uniform1i(gl.getUniformLocation(this.programForEdit, "uSampler"), 0);
     gl.uniform1i(gl.getUniformLocation(this.programForEdit, "uCommandKind"), kindInt);
-    if (pos) {
-      gl.uniform2fv(gl.getUniformLocation(this.programForEdit, "uPosition"), [pos.x, pos.y]);
+    if (position) {
+      gl.uniform2fv(gl.getUniformLocation(this.programForEdit, "uPosition"), [position.x, position.y]);
     }
-    gl.uniform1i(gl.getUniformLocation(this.programForEdit, "uCellValue"), cellVal);
+    if (size) {
+      gl.uniform2fv(gl.getUniformLocation(this.programForEdit, "uSize"), [size.x, size.y]);
+    }
+    if (cellValue) {
+      gl.uniform1i(gl.getUniformLocation(this.programForEdit, "uCellValue"), cellValue);
+    }
+    if (clipboardTexture) {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, clipboardTexture);
+      gl.uniform1i(gl.getUniformLocation(shaderProgram.programForEdit, "uClipboardSampler"), 1);
+      gl.activeTexture(gl.TEXTURE0);
+    }
     gl.drawArrays(gl.POINTS, 0, 1);
   };
   #createProgram(gl, vertexShaderSource, fragmentShaderSource) {

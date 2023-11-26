@@ -127,10 +127,12 @@ function copyToClipboardTexture() {
       overflow.x, overflow.y
     );
   }
+  clipboardEffectiveSize = { x: rect.width, y: rect.height };
 }
 
 const cellTextures = new CellTextures();
 let clipboardTexture = null;
+let clipboardEffectiveSize = { x: 0, y: 0 };
 let buffer;
 
 let width = 512;
@@ -646,13 +648,28 @@ onload = async () => {
           cellTextures.nextFramebuffer,
           cellTextures.currentTexture,
           "Draw",
-          positionInWorldToTexCoord(pointerPosInWorld),
-          getCurrentCellValue()
+          {
+            position: positionInWorldToTexCoord(pointerPosInWorld),
+            cellValue: getCurrentCellValue()
+          }
         );
         cellTextures.advance();
       } else if (pointerActionKind === "Select") {
         selectionPosStartInWorld = pointerPosInWorld;
         selectionPosEndInWorld = pointerPosInWorld;
+      } else if (pointerActionKind === "Paste") {
+        shaderProgram.doEditCommand(
+          gl,
+          cellTextures.nextFramebuffer,
+          cellTextures.currentTexture,
+          "Paste",
+          {
+            position: positionInWorldToTexCoord(pointerPosInWorld),
+            size: clipboardEffectiveSize,
+            clipboardTexture: clipboardTexture
+          }
+        );
+        cellTextures.advance();
       }
       event.preventDefault();
     }
@@ -672,8 +689,10 @@ onload = async () => {
           cellTextures.nextFramebuffer,
           cellTextures.currentTexture,
           "Draw",
-          positionInWorldToTexCoord(pointerPosInWorld),
-          getCurrentCellValue()
+          {
+            position: positionInWorldToTexCoord(pointerPosInWorld),
+            cellValue: getCurrentCellValue()
+          }
         );
         cellTextures.advance();
       } else if (pointerActionKind === "Select") {
@@ -855,8 +874,9 @@ function update() {
         cellTextures.nextFramebuffer,
         cellTextures.currentTexture,
         "Signal",
-        positionInWorldToTexCoord(pointerPosInWorld),
-        undefined
+        {
+          position: positionInWorldToTexCoord(pointerPosInWorld)
+        }
       );
       cellTextures.advance();
     }
