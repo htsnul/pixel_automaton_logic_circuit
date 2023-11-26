@@ -220,6 +220,7 @@ const fragmentShaderForRenderSource = `#version 300 es
   precision mediump float;
 
   uniform sampler2D uSampler;
+  uniform sampler2D uClipboardSampler;
   uniform float uWidth;
   uniform vec2 uPosition;
   uniform float uScale;
@@ -307,7 +308,7 @@ const fragmentShaderForRenderSource = `#version 300 es
           )
         )
       ) {
-        vec4 col = texture(uSampler, (posInTex - uOverlayPastePosition + uSelectionPositionMin) / uWidth);
+        vec4 col = texture(uClipboardSampler, (posInTex - uOverlayPastePosition + vec2(0.5)) / uWidth);
         cellVal = cellValueFromColorComponent(col[0]);
       }
     }

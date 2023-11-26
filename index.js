@@ -29,9 +29,6 @@ class CellTextures {
       const tex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, tex);
       const pixels = new Uint8Array(width * height);
-      for (let i = 0; i < pixels.length; ++i) {
-        pixels[i] = 0;
-      }
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
@@ -58,6 +55,10 @@ class CellTextures {
     return this.#textures[this.#currentIndex];
   }
 
+  get currentFramebuffer() {
+    return this.#framebuffers[this.#currentIndex];
+  }
+
   get nextFramebuffer() {
     return this.#framebuffers[1 - this.#currentIndex];
   }
@@ -67,7 +68,69 @@ class CellTextures {
   }
 }
 
+function initializeClipboardTexture() {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  const pixels = new Uint8Array(width * height);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.R8,
+    width, height,
+    0,
+    gl.RED,
+    gl.UNSIGNED_BYTE,
+    pixels
+  );
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  clipboardTexture = tex;
+}
+
+function copyToClipboardTexture() {
+  const rect = getRectInTexCoordFromPositionStartEnd(
+    selectionPosStartInWorld, selectionPosEndInWorld
+  );
+  gl.bindFramebuffer(gl.FRAMEBUFFER, cellTextures.currentFramebuffer);
+  gl.bindTexture(gl.TEXTURE_2D, clipboardTexture);
+  gl.copyTexSubImage2D(
+    gl.TEXTURE_2D, 0,
+    0, 0,
+    rect.x, rect.y,
+    width - rect.x, height - rect.y
+  );
+  const overflow = {
+    x: rect.x + rect.width - width,
+    y: rect.y + rect.height - height
+  };
+  if (overflow.x > 0) {
+    gl.copyTexSubImage2D(
+      gl.TEXTURE_2D, 0,
+      width - rect.x, 0,
+      0, rect.y,
+      overflow.x, height - rect.y
+    );
+  }
+  if (overflow.y > 0) {
+    gl.copyTexSubImage2D(
+      gl.TEXTURE_2D, 0,
+      0, height - rect.y,
+      rect.x, 0,
+      width - rect.x, overflow.y
+    );
+  }
+  if (overflow.x > 0 && overflow.y > 0) {
+    gl.copyTexSubImage2D(
+      gl.TEXTURE_2D, 0,
+      width - rect.x, height - rect.y,
+      0, 0,
+      overflow.x, overflow.y
+    );
+  }
+}
+
 const cellTextures = new CellTextures();
+let clipboardTexture = null;
 let buffer;
 
 let width = 512;
@@ -208,6 +271,7 @@ function initGl() {
   gl = canvas.getContext("webgl2");
   shaderProgram.initialize(gl);
   cellTextures.initialize(gl);
+  initializeClipboardTexture();
   buffer = gl.createBuffer();
 }
 
@@ -264,38 +328,30 @@ function renderGl() {
     }
     {
       const pointerActionKind = getCurrentPointerActionKind();
-      const isSelectionEnabled = (
-        pointerActionKind === "Select" ||
-        pointerActionKind === "Paste"
-      );
+      const isSelectionEnabled = pointerActionKind === "Select";
       gl.uniform1i(
         gl.getUniformLocation(shaderProgram.programForRender, "uSelectionIsEnabled"),
         isSelectionEnabled
       );
       if (isSelectionEnabled) {
-        const selectionPosMinInWorld = {
-          x: Math.min(selectionPosStartInWorld.x, selectionPosEndInWorld.x),
-          y: Math.min(selectionPosStartInWorld.y, selectionPosEndInWorld.y)
+        const selectionRect = getRectInTexCoordFromPositionStartEnd(
+          selectionPosStartInWorld, selectionPosEndInWorld
+        );
+        const selectionPosMin = {
+          x: selectionRect.x + 0.5,
+          y: selectionRect.y + 0.5
         };
-        const selectionPosMaxInWorld = {
-          x: Math.max(selectionPosStartInWorld.x, selectionPosEndInWorld.x),
-          y: Math.max(selectionPosStartInWorld.y, selectionPosEndInWorld.y)
+        const selectionPosMax = {
+          x: selectionRect.x + selectionRect.width - 0.5,
+          y: selectionRect.y + selectionRect.height - 0.5
         };
-        const selectionPosMinInTexCoord = positionInWorldToTexCoord(selectionPosMinInWorld);
-        const selectionPosMaxInTexCoord = positionInWorldToTexCoord(selectionPosMaxInWorld);
-        if (selectionPosMaxInTexCoord.x < selectionPosMinInTexCoord.x) {
-          selectionPosMaxInTexCoord.x += width;
-        }
-        if (selectionPosMaxInTexCoord.y < selectionPosMinInTexCoord.y) {
-          selectionPosMaxInTexCoord.y += height;
-        }
         gl.uniform2fv(
           gl.getUniformLocation(shaderProgram.programForRender, "uSelectionPositionMin"),
-          [selectionPosMinInTexCoord.x, selectionPosMinInTexCoord.y]
+          [selectionPosMin.x, selectionPosMin.y]
         );
         gl.uniform2fv(
           gl.getUniformLocation(shaderProgram.programForRender, "uSelectionPositionMax"),
-          [selectionPosMaxInTexCoord.x, selectionPosMaxInTexCoord.y]
+          [selectionPosMax.x, selectionPosMax.y]
         );
       }
     }
@@ -307,6 +363,12 @@ function renderGl() {
         isOverlayPasteEnabled
       );
       if (isOverlayPasteEnabled) {
+        {
+          gl.activeTexture(gl.TEXTURE1);
+          gl.bindTexture(gl.TEXTURE_2D, clipboardTexture);
+          gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uClipboardSampler"), 1);
+          gl.activeTexture(gl.TEXTURE0);
+        }
         const pointerPosInTexCoord = positionInWorldToTexCoord(pointerPosInWorld);
         gl.uniform2fv(
           gl.getUniformLocation(shaderProgram.programForRender, "uOverlayPastePosition"),
@@ -378,6 +440,40 @@ function positionInWorldToTexCoord(pos) {
   return {
     x: Math.floor(mod(pos.x, width)) + 0.5,
     y: Math.floor(mod(pos.y, height)) + 0.5
+  };
+}
+
+function getRectInTexCoordFromPositionStartEnd(posS, posE) {
+  const mod = (x, y) => x - y * Math.floor(x / y);
+  const posMinInWorld = {
+    x: Math.min(posS.x, posE.x),
+    y: Math.min(posS.y, posE.y)
+  };
+  const posMaxInWorld = {
+    x: Math.max(posS.x, posE.x),
+    y: Math.max(posS.y, posE.y)
+  };
+  const posMinInTexCoord = positionInWorldToTexCoord(posMinInWorld);
+  const posMaxInTexCoord = positionInWorldToTexCoord(posMaxInWorld);
+  if (posMaxInTexCoord.x < posMinInTexCoord.x) {
+    posMaxInTexCoord.x += width;
+  }
+  if (posMaxInTexCoord.y < posMinInTexCoord.y) {
+    posMaxInTexCoord.y += height;
+  }
+  const beginInTexCoord = {
+    x: Math.floor(posMinInTexCoord.x),
+    y: Math.floor(posMinInTexCoord.y)
+  };
+  const endInTexCoord = {
+    x: Math.ceil(posMaxInTexCoord.x),
+    y: Math.ceil(posMaxInTexCoord.y)
+  };
+  return {
+    x: beginInTexCoord.x,
+    y: beginInTexCoord.y,
+    width: endInTexCoord.x - beginInTexCoord.x,
+    height: endInTexCoord.y - beginInTexCoord.y
   };
 }
 
@@ -600,6 +696,7 @@ onload = async () => {
       }
       if (getCurrentPointerActionKind() === "Select") {
         selectionPosEndInWorld = pointerPosInWorld;
+        copyToClipboardTexture();
       }
       isDragging = false;
       event.preventDefault();
