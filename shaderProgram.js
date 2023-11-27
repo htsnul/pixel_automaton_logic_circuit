@@ -418,7 +418,7 @@ class ShaderProgram {
     if (size) {
       gl.uniform2fv(gl.getUniformLocation(this.programForEdit, "uSize"), [size.x, size.y]);
     }
-    if (cellValue) {
+    if (cellValue !== undefined) {
       gl.uniform1i(gl.getUniformLocation(this.programForEdit, "uCellValue"), cellValue);
     }
     if (clipboardTexture) {
