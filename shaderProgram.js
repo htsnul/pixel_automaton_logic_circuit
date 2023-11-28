@@ -311,27 +311,28 @@ const fragmentShaderForRenderSource = `#version 300 es
       cellVal = makeCellValue(CellKindWire, CellWireKindWire, true, true, true, true);
     }
     if (uOverlayPasteIsEnabled) {
+      vec2 pos = vec2(floor(uOverlayPastePosition));
       vec2 size = uSelectionRectSize;
       if (
         (
           (
-            uOverlayPastePosition.x <= floor(posInTex.x) + 0.5 &&
-            floor(posInTex.x) + 0.5 <= uOverlayPastePosition.x + size.x
+            pos.x <= posInTex.x &&
+            posInTex.x < pos.x + size.x
           ) || (
-            uOverlayPastePosition.x <= floor(posInTex.x + uWidth) + 0.5 &&
-            floor(posInTex.x + uWidth) + 0.5 <= uOverlayPastePosition.x + size.x
+            pos.x <= posInTex.x + uWidth &&
+            posInTex.x + uWidth < pos.x + size.x
           )
         ) && (
           (
-            uOverlayPastePosition.y <= floor(posInTex.y) + 0.5 &&
-            floor(posInTex.y) + 0.5 <= uOverlayPastePosition.y + size.y
+            pos.y <= posInTex.y &&
+            posInTex.y < pos.y + size.y
           ) || (
-            uOverlayPastePosition.y <= floor(posInTex.y + uWidth) + 0.5 &&
-            floor(posInTex.y + uWidth) + 0.5 <= uOverlayPastePosition.y + size.y
+            pos.y <= posInTex.y + uWidth &&
+            posInTex.y + uWidth < pos.y + size.y
           )
         )
       ) {
-        vec4 col = texture(uClipboardSampler, (posInTex - uOverlayPastePosition + vec2(0.5)) / uWidth);
+        vec4 col = texture(uClipboardSampler, (posInTex - pos) / uWidth);
         cellVal = cellValueFromColorComponent(col[0]);
       }
     }
