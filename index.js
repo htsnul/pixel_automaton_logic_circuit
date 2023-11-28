@@ -471,6 +471,51 @@ function getRectInTexCoordFromPositionStartEnd(posS, posE) {
   };
 }
 
+function load() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.style.display = "none";
+  input.onchange = (event) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const pixels = new Uint8Array(reader.result);
+      gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
+      gl.texSubImage2D(
+        gl.TEXTURE_2D,
+        0, 0, 0,
+        width, height,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        pixels
+      );
+    };
+    reader.readAsArrayBuffer(input.files[0]);
+  };
+  document.body.append(input);
+  input.click();
+  input.remove();
+}
+
+function save() {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, cellTextures.currentFramebuffer);
+  const pixels = new Uint8Array(width * height);
+  gl.readPixels(0, 0, width, height, gl.RED, gl.UNSIGNED_BYTE, pixels);
+  const blob = new Blob([pixels]);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const dateTimeStr = (new Date).toISOString()
+    .replace(/\..*$/, "")
+    .replaceAll("-", "")
+    .replaceAll(":", "");
+  a.download = `palc_${dateTimeStr}.dat`;
+  a.style.display = "none";
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 onload = async () => {
   {
     const style = document.createElement("style");
@@ -478,13 +523,23 @@ onload = async () => {
       .control-panel {
         display: flex;
         align-items: center;
+        & > div {
+          display: flex;
+          margin: 8px;
+          align-items: center;
+        }
       }
       .control-panel button {
         box-sizing: border-box;
-        width: 24px;
-        height: 24px;
         padding: 2px;
         margin: 2px;
+        & img {
+          display: block;
+          width: 16px;
+          height: 16px;
+        }
+      }
+      .control-panel button img {
       }
       input[type="radio"] {
         display: none;
@@ -510,12 +565,12 @@ onload = async () => {
     const div = document.createElement("div");
     div.innerHTML = `
       <div class="control-panel">
-        <div style="margin: 8px;">
+        <div>
           <button id="zoom-out-button"><img src="icon/minus_icon.svg"></button>
           <span id="zoom-ratio" style="display: inline-block; width: 24px; text-align: center;"></span>
           <button id="zoom-in-button"><img src="icon/plus_icon.svg"></button>
         </div>
-        <div style="margin: 8px;">
+        <div>
           <select id="hz-select">
             <option value="0">0Hz</option>
             <option value="1">1Hz</option>
@@ -532,12 +587,16 @@ onload = async () => {
             <option value="6000">6.0KHz</option>
           </select>
         </div>
-        <div style="margin: 8px;">
+        <div>
           <button id="earth-button" title="Earth GND"><img src="icon/earth_icon.svg"></button>
+        </div>
+        <div>
+          <button id="load-button">Load</button>
+          <button id="save-button">Save</button>
         </div>
       </div>
       <div class="control-panel">
-        <div style="display: flex; margin: 8px;">
+        <div>
           <div><label title="Scroll">
             <input name="pointer-action-kind" type="radio" value="Scroll" checked>
             <img src="icon/scroll_icon.svg">
@@ -559,7 +618,7 @@ onload = async () => {
             <img src="icon/signal_icon.svg">
           </label></div>
         </div>
-        <div style="display: flex; margin: 8px;">
+        <div>
           <div><label title="None">
             <input name="cell-kind" type="radio" value="None">
             <img src="icon/none_icon.svg">
@@ -573,7 +632,7 @@ onload = async () => {
             <img src="icon/wire_cross_icon.svg">
           </label></div>
         </div>
-        <div style="display: flex; margin: 8px;">
+        <div>
           <div><label title="In-AND">
             <input name="cell-kind" type="radio" value="InAnd">
             <img src="icon/in_and_icon.svg">
@@ -587,7 +646,7 @@ onload = async () => {
             <img src="icon/in_xor_icon.svg">
           </label></div>
         </div>
-        <div style="display: flex; margin: 8px;">
+        <div>
           <div><label title="Out">
             <input name="cell-kind" type="radio" value="Out">
             <img src="icon/out_icon.svg">
@@ -599,12 +658,6 @@ onload = async () => {
         </div>
       <div>
     `;
-    const zoom = (sign) => {
-      if (zoom !== 0) {
-        targetZoomLevel = Math.min(Math.max(0, targetZoomLevel + sign), 6);
-      }
-      div.querySelector("#zoom-ratio").innerHTML = "x" + Math.pow(2, targetZoomLevel);
-    };
     div.querySelector("#earth-button").onclick = () => {
       shaderProgram.doEditCommand(
         gl,
@@ -614,6 +667,14 @@ onload = async () => {
         {}
       );
       cellTextures.advance();
+    };
+    div.querySelector("#load-button").onclick = () => load();
+    div.querySelector("#save-button").onclick = () => save();
+    const zoom = (sign) => {
+      if (zoom !== 0) {
+        targetZoomLevel = Math.min(Math.max(0, targetZoomLevel + sign), 6);
+      }
+      div.querySelector("#zoom-ratio").innerHTML = "x" + Math.pow(2, targetZoomLevel);
     };
     zoom(0);
     div.querySelector("#zoom-out-button").onclick = () => zoom(-1);
