@@ -471,6 +471,21 @@ function getRectInTexCoordFromPositionStartEnd(posS, posE) {
   };
 }
 
+async function loadSample() {
+  const res = await fetch("sample.dat");
+  const arrayBuffer = await res.arrayBuffer();
+  const pixels = new Uint8Array(arrayBuffer);
+  gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
+  gl.texSubImage2D(
+    gl.TEXTURE_2D,
+    0, 0, 0,
+    width, height,
+    gl.RED,
+    gl.UNSIGNED_BYTE,
+    pixels
+  );
+}
+
 function load() {
   const input = document.createElement("input");
   input.type = "file";
@@ -777,7 +792,8 @@ onload = async () => {
     document.querySelector("main").append(canvas);
     initGl();
   }
-  prepareList();
+  //prepareList();
+  await loadSample();
   requestAnimationFrame(update);
 };
 
