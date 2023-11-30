@@ -337,6 +337,18 @@ const fragmentShaderForRenderSource = `#version 300 es
       }
     }
     int kind = getCellKind(cellVal);
+    if (kind == CellKindNone) {
+      if (abs(posInTex.x) < 2.0 / uScale || abs(posInTex.y) < 2.0 / uScale) {
+        fragColor = vec4(4.0 / 16.0, 4.0 / 16.0, 4.0 / 16.0, 1.0);
+        return;
+      }
+      if (abs(mod(posInTex.x, 8.0)) < 2.0 / uScale || abs(mod(posInTex.y, 8.0)) < 2.0 / uScale) {
+        fragColor = vec4(3.0 / 16.0, 3.0 / 16.0, 3.0 / 16.0, 1.0);
+        return;
+      }
+      fragColor = vec4(2.0 / 16.0, 2.0 / 16.0, 2.0 / 16.0, 1.0);
+      return;
+    }
     int subKind = getCellSubKind(cellVal);
     bool signaling = (
       getCellSignalT(cellVal) ||
