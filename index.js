@@ -3,6 +3,7 @@ import { cellsTextures } from "./cellsTextures.js"
 import { clipboard } from "./clipboard.js"
 import { controlPanel } from "./controlPanel.js"
 import { saveLoad } from "./saveLoad.js"
+import { cellValueUtil } from "./cellValueUtil.js"
 
 const circuitFilenames = [
   "logic_gates.json",
@@ -191,7 +192,7 @@ function renderGl() {
     gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uWidth"), width);
     gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForRender, "uPosition"), [position.x, position.y]);
     {
-      const pointerActionKind = getCurrentPointerActionKind();
+      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
       const isOverlayCellEnabled = (
         pointerActionKind === "Draw" ||
         pointerActionKind === "Signal"
@@ -208,9 +209,9 @@ function renderGl() {
         );
         const cellValue = (() => {
           if (pointerActionKind === "Draw") {
-            return getCurrentCellValue();
+            return controlPanel.getCurrentCellValue();
           } else if (pointerActionKind === "Signal") {
-            return cellValueFromCellSerialKind("Wire") | 0x0f;
+            return cellValueUtil.createCellValue("Wire", true);
           }
         })();
         gl.uniform1i(
@@ -220,7 +221,7 @@ function renderGl() {
       }
     }
     {
-      const pointerActionKind = getCurrentPointerActionKind();
+      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
       const isSelectionEnabled = pointerActionKind === "Select";
       gl.uniform1i(
         gl.getUniformLocation(shaderProgram.programForRender, "uSelectionIsEnabled"),
@@ -241,7 +242,7 @@ function renderGl() {
       }
     }
     {
-      const pointerActionKind = getCurrentPointerActionKind();
+      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
       const isOverlayPasteEnabled = pointerActionKind === "Paste";
       gl.uniform1i(
         gl.getUniformLocation(shaderProgram.programForRender, "uOverlayPasteIsEnabled"),
@@ -285,31 +286,6 @@ function prepareList() {
     ul.append(li);
   });
   document.querySelector("main").append(ul);
-}
-
-function getCurrentPointerActionKind() {
-  return document.querySelector("input[name='pointer-action-kind']:checked").value;
-}
-
-function getCurrentCellSerialKind() {
-  return document.querySelector("input[name='cell-kind']:checked").value;
-}
-
-function cellValueFromCellSerialKind(kind) {
-  switch (kind) {
-    case "None": return (0 << 6) + (0 << 4);
-    case "Wire": return (1 << 6) + (0 << 4);
-    case "WireCross": return (1 << 6) + (1 << 4);
-    case "InAnd": return (2 << 6) + (0 << 4);
-    case "InOr": return (2 << 6) + (1 << 4);
-    case "InXor": return (2 << 6) + (2 << 4);
-    case "Out": return (3 << 6) + (0 << 4);
-    case "OutNot": return (3 << 6) + (1 << 4);
-  }
-}
-
-function getCurrentCellValue() {
-  return cellValueFromCellSerialKind(getCurrentCellSerialKind());
 }
 
 function positionInCanvasToWorld(posInCanvas) {
@@ -394,7 +370,7 @@ onload = async () => {
       isDragging = true;
       canvas.setPointerCapture(event.pointerId);
       pointerPosInWorld = positionInCanvasToWorld(getPositionInCanvasFromEvent(event));
-      const pointerActionKind = getCurrentPointerActionKind();
+      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
       if (pointerActionKind === "Draw") {
         shaderProgram.doEditCommand(
           gl,
@@ -403,7 +379,7 @@ onload = async () => {
           "Draw",
           {
             position: positionInWorldToTexCoord(pointerPosInWorld),
-            cellValue: getCurrentCellValue()
+            cellValue: controlPanel.getCurrentCellValue()
           }
         );
         cellsTextures.advance();
@@ -431,7 +407,7 @@ onload = async () => {
       if (!isDragging) {
         return;
       }
-      const pointerActionKind = getCurrentPointerActionKind();
+      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
       if (pointerActionKind === "Scroll") {
         const scale = Math.pow(2, zoomLevel);
         position.x += event.movementX / scale;
@@ -444,7 +420,7 @@ onload = async () => {
           "Draw",
           {
             position: positionInWorldToTexCoord(pointerPosInWorld),
-            cellValue: getCurrentCellValue()
+            cellValue: controlPanel.getCurrentCellValue()
           }
         );
         cellsTextures.advance();
@@ -458,7 +434,7 @@ onload = async () => {
       if (!isDragging) {
         return;
       }
-      if (getCurrentPointerActionKind() === "Select") {
+      if (controlPanel.getCurrentPointerActionKind() === "Select") {
         selectionPosEndInWorld = pointerPosInWorld;
         const rect = getRectInTexCoordFromPositionStartEnd(
           selectionPosStartInWorld, selectionPosEndInWorld
@@ -627,7 +603,7 @@ function update() {
   }
   for (let i = 0; i < updateCount; ++i) {
     updateGl();
-    if (getCurrentPointerActionKind() === "Signal" && isDragging) {
+    if (controlPanel.getCurrentPointerActionKind() === "Signal" && isDragging) {
       shaderProgram.doEditCommand(
         gl,
         cellsTextures.nextFramebuffer,

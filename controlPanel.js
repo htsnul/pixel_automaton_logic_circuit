@@ -1,6 +1,7 @@
 import { shaderProgram } from "./shaderProgram.js"
 import { cellsTextures } from "./cellsTextures.js"
 import { saveLoad } from "./saveLoad.js"
+import { cellValueUtil } from "./cellValueUtil.js"
 
 class ControlPanel {
   targetZoomLevel = 4.0;
@@ -158,6 +159,18 @@ class ControlPanel {
     div.querySelector("#zoom-out-button").onclick = () => zoom(-1);
     div.querySelector("#zoom-in-button").onclick = () => zoom(+1);
     document.body.append(div);
+  }
+
+  getCurrentPointerActionKind() {
+    return document.querySelector("input[name='pointer-action-kind']:checked").value;
+  }
+
+  getCurrentCellValue() {
+    return cellValueUtil.createCellValue(this.#getCurrentCellKind());
+  }
+
+  #getCurrentCellKind() {
+    return document.querySelector("input[name='cell-kind']:checked").value;
   }
 }
 
