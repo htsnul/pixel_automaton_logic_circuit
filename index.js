@@ -1,4 +1,6 @@
 import { shaderProgram } from "./shaderProgram.js"
+import { cellsTextures } from "./cellsTextures.js"
+import { clipboard } from "./clipboard.js"
 
 const circuitFilenames = [
   "logic_gates.json",
@@ -20,119 +22,6 @@ const circuitFilenames = [
 ];
 let gl;
 
-class CellTextures {
-  #textures = [];
-  #currentIndex = 0;
-  #framebuffers = [];
-  initialize(gl) {
-    for (let i = 0; i < 2; ++i) {
-      const tex = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      const pixels = new Uint8Array(width * height);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.R8,
-        width, height,
-        0,
-        gl.RED,
-        gl.UNSIGNED_BYTE,
-        pixels
-      );
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      const fb = gl.createFramebuffer();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-      gl.framebufferTexture2D(
-        gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0
-      );
-      this.#textures[i] = tex;
-      this.#framebuffers[i] = fb;
-    }
-  }
-
-  get currentTexture() {
-    return this.#textures[this.#currentIndex];
-  }
-
-  get currentFramebuffer() {
-    return this.#framebuffers[this.#currentIndex];
-  }
-
-  get nextFramebuffer() {
-    return this.#framebuffers[1 - this.#currentIndex];
-  }
-
-  advance() {
-    this.#currentIndex = 1 - this.#currentIndex;
-  }
-}
-
-function initializeClipboardTexture() {
-  const tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  const pixels = new Uint8Array(width * height);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.R8,
-    width, height,
-    0,
-    gl.RED,
-    gl.UNSIGNED_BYTE,
-    pixels
-  );
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  clipboardTexture = tex;
-}
-
-function copyToClipboardTexture() {
-  const rect = getRectInTexCoordFromPositionStartEnd(
-    selectionPosStartInWorld, selectionPosEndInWorld
-  );
-  gl.bindFramebuffer(gl.FRAMEBUFFER, cellTextures.currentFramebuffer);
-  gl.bindTexture(gl.TEXTURE_2D, clipboardTexture);
-  gl.copyTexSubImage2D(
-    gl.TEXTURE_2D, 0,
-    0, 0,
-    rect.x, rect.y,
-    width - rect.x, height - rect.y
-  );
-  const overflow = {
-    x: rect.x + rect.width - width,
-    y: rect.y + rect.height - height
-  };
-  if (overflow.x > 0) {
-    gl.copyTexSubImage2D(
-      gl.TEXTURE_2D, 0,
-      width - rect.x, 0,
-      0, rect.y,
-      overflow.x, height - rect.y
-    );
-  }
-  if (overflow.y > 0) {
-    gl.copyTexSubImage2D(
-      gl.TEXTURE_2D, 0,
-      0, height - rect.y,
-      rect.x, 0,
-      width - rect.x, overflow.y
-    );
-  }
-  if (overflow.x > 0 && overflow.y > 0) {
-    gl.copyTexSubImage2D(
-      gl.TEXTURE_2D, 0,
-      width - rect.x, height - rect.y,
-      0, 0,
-      overflow.x, overflow.y
-    );
-  }
-  clipboardEffectiveSize = { x: rect.width, y: rect.height };
-}
-
-const cellTextures = new CellTextures();
-let clipboardTexture = null;
-let clipboardEffectiveSize = { x: 0, y: 0 };
 let buffer;
 
 let width = 512;
@@ -256,7 +145,7 @@ async function loadCircuit(filename) {
       pixels[((height - y - 1) * width + x)] = (kind << 6) + (subKind << 4);
     }
   }
-  gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
+  gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
   gl.texSubImage2D(
     gl.TEXTURE_2D,
     0, 0, 0,
@@ -272,18 +161,18 @@ function initGl() {
   const canvas = document.querySelector("canvas");
   gl = canvas.getContext("webgl2");
   shaderProgram.initialize(gl);
-  cellTextures.initialize(gl);
-  initializeClipboardTexture();
+  cellsTextures.initialize(gl, width, height);
+  clipboard.initialize(gl, width, height);
   buffer = gl.createBuffer();
 }
 
 function updateGl() {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, cellTextures.nextFramebuffer);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, cellsTextures.nextFramebuffer);
   gl.useProgram(shaderProgram.programForUpdate);
-  gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
+  gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
   gl.uniform1i(gl.getUniformLocation(shaderProgram.programForUpdate, "uSampler"), 0);
   gl.drawArrays(gl.POINTS, 0, 1);
-  cellTextures.advance();
+  cellsTextures.advance();
 }
 
 function renderGl() {
@@ -295,7 +184,7 @@ function renderGl() {
     gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
   }
   {
-    gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
+    gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
     gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
     gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uWidth"), width);
     gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForRender, "uPosition"), [position.x, position.y]);
@@ -359,7 +248,7 @@ function renderGl() {
       if (isOverlayPasteEnabled) {
         {
           gl.activeTexture(gl.TEXTURE1);
-          gl.bindTexture(gl.TEXTURE_2D, clipboardTexture);
+          gl.bindTexture(gl.TEXTURE_2D, clipboard.texture);
           gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uClipboardSampler"), 1);
           gl.activeTexture(gl.TEXTURE0);
         }
@@ -475,7 +364,7 @@ async function loadSample() {
   const res = await fetch("sample.dat");
   const arrayBuffer = await res.arrayBuffer();
   const pixels = new Uint8Array(arrayBuffer);
-  gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
+  gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
   gl.texSubImage2D(
     gl.TEXTURE_2D,
     0, 0, 0,
@@ -494,7 +383,7 @@ function load() {
     const reader = new FileReader();
     reader.onload = () => {
       const pixels = new Uint8Array(reader.result);
-      gl.bindTexture(gl.TEXTURE_2D, cellTextures.currentTexture);
+      gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
       gl.texSubImage2D(
         gl.TEXTURE_2D,
         0, 0, 0,
@@ -512,7 +401,7 @@ function load() {
 }
 
 function save() {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, cellTextures.currentFramebuffer);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, cellsTextures.currentFramebuffer);
   const pixels = new Uint8Array(width * height);
   gl.readPixels(0, 0, width, height, gl.RED, gl.UNSIGNED_BYTE, pixels);
   const blob = new Blob([pixels]);
@@ -668,12 +557,12 @@ onload = async () => {
     div.querySelector("#earth-button").onclick = () => {
       shaderProgram.doEditCommand(
         gl,
-        cellTextures.nextFramebuffer,
-        cellTextures.currentTexture,
+        cellsTextures.nextFramebuffer,
+        cellsTextures.currentTexture,
         "Earth",
         {}
       );
-      cellTextures.advance();
+      cellsTextures.advance();
     };
     div.querySelector("#load-button").onclick = () => load();
     div.querySelector("#save-button").onclick = () => save();
@@ -714,31 +603,31 @@ onload = async () => {
       if (pointerActionKind === "Draw") {
         shaderProgram.doEditCommand(
           gl,
-          cellTextures.nextFramebuffer,
-          cellTextures.currentTexture,
+          cellsTextures.nextFramebuffer,
+          cellsTextures.currentTexture,
           "Draw",
           {
             position: positionInWorldToTexCoord(pointerPosInWorld),
             cellValue: getCurrentCellValue()
           }
         );
-        cellTextures.advance();
+        cellsTextures.advance();
       } else if (pointerActionKind === "Select") {
         selectionPosStartInWorld = pointerPosInWorld;
         selectionPosEndInWorld = pointerPosInWorld;
       } else if (pointerActionKind === "Paste") {
         shaderProgram.doEditCommand(
           gl,
-          cellTextures.nextFramebuffer,
-          cellTextures.currentTexture,
+          cellsTextures.nextFramebuffer,
+          cellsTextures.currentTexture,
           "Paste",
           {
             position: positionInWorldToTexCoord(pointerPosInWorld),
-            size: clipboardEffectiveSize,
-            clipboardTexture: clipboardTexture
+            size: clipboard.effectiveSize,
+            clipboardTexture: clipboard.texture
           }
         );
-        cellTextures.advance();
+        cellsTextures.advance();
       }
       event.preventDefault();
     }
@@ -755,15 +644,15 @@ onload = async () => {
       } else if (pointerActionKind === "Draw") {
         shaderProgram.doEditCommand(
           gl,
-          cellTextures.nextFramebuffer,
-          cellTextures.currentTexture,
+          cellsTextures.nextFramebuffer,
+          cellsTextures.currentTexture,
           "Draw",
           {
             position: positionInWorldToTexCoord(pointerPosInWorld),
             cellValue: getCurrentCellValue()
           }
         );
-        cellTextures.advance();
+        cellsTextures.advance();
       } else if (pointerActionKind === "Select") {
         selectionPosEndInWorld = pointerPosInWorld;
       }
@@ -776,7 +665,10 @@ onload = async () => {
       }
       if (getCurrentPointerActionKind() === "Select") {
         selectionPosEndInWorld = pointerPosInWorld;
-        copyToClipboardTexture();
+        const rect = getRectInTexCoordFromPositionStartEnd(
+          selectionPosStartInWorld, selectionPosEndInWorld
+        );
+        clipboard.copyFrom(gl, cellsTextures.currentFramebuffer, rect);
       }
       isDragging = false;
       event.preventDefault();
@@ -941,14 +833,14 @@ function update() {
     if (getCurrentPointerActionKind() === "Signal" && isDragging) {
       shaderProgram.doEditCommand(
         gl,
-        cellTextures.nextFramebuffer,
-        cellTextures.currentTexture,
+        cellsTextures.nextFramebuffer,
+        cellsTextures.currentTexture,
         "Signal",
         {
           position: positionInWorldToTexCoord(pointerPosInWorld)
         }
       );
-      cellTextures.advance();
+      cellsTextures.advance();
     }
   }
   {
