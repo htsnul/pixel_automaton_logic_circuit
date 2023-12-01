@@ -1,8 +1,8 @@
-<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
- <rect x="0.5" y="0.5" width="14" height="14" fill="#8cf" stroke="#8cf" />
+<svg width="15" height="15" xmlns="http://www.w3.org/2000/svg">
+ <rect x="0" y="0" width="15" height="15" fill="#8cf" stroke="#8cf" />
  <g fill="transparent" stroke="#468">
    <path d="M 0.5 5.5 h 5 z" />
    <path d="M 0.5 9.5 h 5 z" />
-   <path d="M 4.5 2.5 q 2 5, 0 10 q 8 -1, 9 -5, q -1 -4, -9 -5 z" />
+   <path d="M 4.5 2.5 q 2 5, 0 10 q 8 -1, 9 -5 q -1 -4, -9 -5 z" />
  </g>
 </svg>

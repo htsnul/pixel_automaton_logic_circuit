@@ -538,39 +538,35 @@ onload = async () => {
       .control-panel {
         display: flex;
         align-items: center;
-        & > div {
-          display: flex;
-          margin: 8px;
-          align-items: center;
-        }
+      }
+      .control-panel > div {
+        display: flex;
+        margin: 8px;
+        align-items: center;
       }
       .control-panel button {
         box-sizing: border-box;
         padding: 2px;
         margin: 2px;
-        & img {
-          display: block;
-          width: 16px;
-          height: 16px;
-        }
       }
-      .control-panel button img {
-      }
-      input[type="radio"] {
-        display: none;
-      }
-      label:has(input[type="radio"]) {
+      .control-panel button > img {
         display: block;
-        width: 20px;
-        height: 20px;
+        width: 15px;
+        height: 15px;
+      }
+      .control-panel input[type="radio"] {
+        appearance: none;
+        position: absolute;
+      }
+      .control-panel input[type="radio"] + img {
+        display: block;
+        width: 15px;
+        height: 15px;
+        padding: 2px;
         border: 2px solid transparent;
         border-radius: 3px;
       }
-      label:has(input[type="radio"]) > img {
-        display: block;
-        margin: 2px;
-      }
-      label:has(input[type="radio"]:checked) {
+      .control-panel input[type="radio"]:checked + img {
         border-color: #888;
       }
     `;
@@ -582,7 +578,7 @@ onload = async () => {
       <div class="control-panel">
         <div>
           <button id="zoom-out-button"><img src="icon/minus_icon.svg"></button>
-          <span id="zoom-ratio" style="display: inline-block; width: 24px; text-align: center;"></span>
+          <span id="zoom-ratio" style="display: inline-block; width: 32px; text-align: center;"></span>
           <button id="zoom-in-button"><img src="icon/plus_icon.svg"></button>
         </div>
         <div>
@@ -646,8 +642,6 @@ onload = async () => {
             <input name="cell-kind" type="radio" value="WireCross">
             <img src="icon/wire_cross_icon.svg">
           </label></div>
-        </div>
-        <div>
           <div><label title="In-AND">
             <input name="cell-kind" type="radio" value="InAnd">
             <img src="icon/in_and_icon.svg">
@@ -660,8 +654,6 @@ onload = async () => {
             <input name="cell-kind" type="radio" value="InXor">
             <img src="icon/in_xor_icon.svg">
           </label></div>
-        </div>
-        <div>
           <div><label title="Out">
             <input name="cell-kind" type="radio" value="Out">
             <img src="icon/out_icon.svg">

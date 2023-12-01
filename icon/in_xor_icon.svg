@@ -1,9 +1,9 @@
-<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
- <rect x="0.5" y="0.5" width="14" height="14" fill="#f8f" stroke="#f8f" />
- <g fill="transparent" stroke="#468">
+<svg width="15" height="15" xmlns="http://www.w3.org/2000/svg">
+ <rect x="0" y="0" width="15" height="15" fill="#f8f" stroke="#f8f" />
+ <g fill="transparent" stroke="#848">
    <path d="M 0.5 5.5 h 5 z" />
    <path d="M 0.5 9.5 h 5 z" />
    <path d="M 4.5 2.5 q 2 5, 0 10" />
-   <path d="M 6.5 2.5 q 2 5, 0 10 q 6 -1, 7 -5, q -1 -4, -7 -5 z" />
+   <path d="M 6.5 2.5 q 2 5, 0 10 q 6 -1, 7 -5 q -1 -4, -7 -5 z" />
  </g>
 </svg>
