@@ -1,5 +1,5 @@
 <svg width="15" height="15" xmlns="http://www.w3.org/2000/svg">
- <rect x="0" y="0" width="15" height="15" fill="#aaf" stroke="#aaf" />
+ <rect x="0" y="0" width="15" height="15" fill="#88f" stroke="#88f" />
  <g fill="transparent" stroke="#448">
    <path d="M 4.5 5.5 v 4" />
    <path d="M 4.5 7.5 h 10" />

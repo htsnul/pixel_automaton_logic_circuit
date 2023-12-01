@@ -359,31 +359,35 @@ const fragmentShaderForRenderSource = `#version 300 es
     vec4 normalColor = vec4(0.2, 0.2, 0.2, 1.0);
     vec4 signalColor = vec4(0.2, 0.2, 0.2, 1.0);
     if (kind == CellKindWire && subKind == CellWireKindWire) {
-      normalColor = vec4(0.5, 0.5, 0.5, 1.0);
-      signalColor = vec4(0.75, 0.75, 0.75, 1.0);
+      vec4 color = vec4(8.0, 8.0, 8.0, 16.0) / 16.0;
+      fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 2.0 : 0.0);
+      return;
     } else if (kind == CellKindWire && subKind == CellWireKindCross) {
-      normalColor = vec4(0.4, 0.7, 0.4, 1.0);
-      signalColor = vec4(0.8, 0.9, 0.8, 1.0);
-    } else if (kind == CellKindWire && subKind == CellWireKindOne) {
-      normalColor = vec4(0.6, 0.6, 0.6, 1.0);
-      signalColor = vec4(1.0, 1.0, 1.0, 1.0);
+      vec4 color = vec4(8.0, 12.0, 8.0, 16.0) / 16.0;
+      fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 2.0 : 0.0);
+      return;
     } else if (kind == CellKindComponent && subKind == CellComponentKindAnd) {
-      normalColor = vec4(1.0, 0.8, 0.5, 1.0);
-      signalColor = normalColor;
+      vec4 color = vec4(16.0, 12.0, 8.0, 16.0) / 16.0;
+      fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
+      return;
     } else if (kind == CellKindComponent && subKind == CellComponentKindOr) {
-      normalColor = vec4(0.3, 0.7, 1.0, 1.0);
-      signalColor = normalColor;
+      vec4 color = vec4(8.0, 12.0, 16.0, 16.0) / 16.0;
+      fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
+      return;
     } else if (kind == CellKindComponent && subKind == CellComponentKindXor) {
-      normalColor = vec4(1.0, 0.25, 1.0, 1.0);
-      signalColor = normalColor;
+      vec4 color = vec4(16.0, 8.0, 16.0, 16.0) / 16.0;
+      fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
+      return;
     } else if (kind == CellKindOut && subKind == CellOutKindOut) {
-      normalColor = vec4(0.4, 0.4, 1.0, 1.0);
-      signalColor = normalColor;
+      vec4 color = vec4(8.0, 8.0, 16.0, 16.0) / 16.0;
+      fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
+      return;
     } else if (kind == CellKindOut && subKind == CellOutKindInvOut) {
-      normalColor = vec4(0.8, 0.4, 0.4, 1.0);
-      signalColor = normalColor;
+      vec4 color = vec4(16.0, 8.0, 8.0, 16.0) / 16.0;
+      fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
+      return;
     }
-    fragColor = mix(normalColor, signalColor, signaling ? 1.0 : 0.0);
+    fragColor = vec4(0.0);
   }
 `;
 
