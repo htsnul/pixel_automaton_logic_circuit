@@ -1,17 +1,20 @@
 class CellsTextures {
+  width = 512;
+  height = this.width;
   #textures = [];
   #currentIndex = 0;
   #framebuffers = [];
   initialize(gl, width, height) {
-    for (let i = 0; i < 2; ++i) {
+    const texCount = 2;
+    for (let i = 0; i < texCount; ++i) {
       const tex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, tex);
-      const pixels = new Uint8Array(width * height);
+      const pixels = new Uint8Array(this.width * this.height);
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
         gl.R8,
-        width, height,
+        this.width, this.height,
         0,
         gl.RED,
         gl.UNSIGNED_BYTE,

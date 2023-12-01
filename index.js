@@ -1,6 +1,8 @@
 import { shaderProgram } from "./shaderProgram.js"
 import { cellsTextures } from "./cellsTextures.js"
 import { clipboard } from "./clipboard.js"
+import { controlPanel } from "./controlPanel.js"
+import { saveLoad } from "./saveLoad.js"
 
 const circuitFilenames = [
   "logic_gates.json",
@@ -24,8 +26,6 @@ let gl;
 
 let buffer;
 
-let width = 512;
-let height = width;
 let cells = [];
 let circuitData;
 let frameIndex = 0;
@@ -33,7 +33,6 @@ let clockIsOn = false;
 
 let position = { x: 0, y: 0 };
 let zoomLevel = 4.0;
-let targetZoomLevel = zoomLevel;
 let pointerPosInWorld = { x: 0, y: 0 };
 let selectionPosStartInWorld = { x: 0, y: 0 };
 let selectionPosEndInWorld = { x: 0, y: 0 };
@@ -66,6 +65,8 @@ async function loadCircuit(filename) {
   const strs = circuitData.dataStrs;
   //height = strs.length;
   //width = strs[0].length;
+  const width = cellsTextures.width;
+  const height = cellsTextures.height;
   cells = [];
   for (let y = 0; y < height; ++y) {
     cells.push([]);
@@ -161,8 +162,8 @@ function initGl() {
   const canvas = document.querySelector("canvas");
   gl = canvas.getContext("webgl2");
   shaderProgram.initialize(gl);
-  cellsTextures.initialize(gl, width, height);
-  clipboard.initialize(gl, width, height);
+  cellsTextures.initialize(gl);
+  clipboard.initialize(gl, cellsTextures.width, cellsTextures.height);
   buffer = gl.createBuffer();
 }
 
@@ -184,6 +185,7 @@ function renderGl() {
     gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
   }
   {
+    const width = cellsTextures.width;
     gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
     gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
     gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uWidth"), width);
@@ -311,6 +313,8 @@ function getCurrentCellValue() {
 }
 
 function positionInCanvasToWorld(posInCanvas) {
+  const width = cellsTextures.width;
+  const height = cellsTextures.height;
   const scale = Math.pow(2, zoomLevel);
   return {
     x: (posInCanvas.x - 0.5 * width) / scale - position.x,
@@ -319,6 +323,8 @@ function positionInCanvasToWorld(posInCanvas) {
 }
 
 function positionInWorldToTexCoord(pos) {
+  const width = cellsTextures.width;
+  const height = cellsTextures.height;
   const mod = (x, y) => x - y * Math.floor(x / y);
   return {
     x: Math.floor(mod(pos.x, width)) + 0.5,
@@ -327,6 +333,8 @@ function positionInWorldToTexCoord(pos) {
 }
 
 function getRectInTexCoordFromPositionStartEnd(posS, posE) {
+  const width = cellsTextures.width;
+  const height = cellsTextures.height;
   const mod = (x, y) => x - y * Math.floor(x / y);
   const posMinInWorld = {
     x: Math.min(posS.x, posE.x),
@@ -360,228 +368,15 @@ function getRectInTexCoordFromPositionStartEnd(posS, posE) {
   };
 }
 
-async function loadSample() {
-  const res = await fetch("sample.dat");
-  const arrayBuffer = await res.arrayBuffer();
-  const pixels = new Uint8Array(arrayBuffer);
-  gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
-  gl.texSubImage2D(
-    gl.TEXTURE_2D,
-    0, 0, 0,
-    width, height,
-    gl.RED,
-    gl.UNSIGNED_BYTE,
-    pixels
-  );
-}
-
-function load() {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.style.display = "none";
-  input.onchange = (event) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const pixels = new Uint8Array(reader.result);
-      gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
-      gl.texSubImage2D(
-        gl.TEXTURE_2D,
-        0, 0, 0,
-        width, height,
-        gl.RED,
-        gl.UNSIGNED_BYTE,
-        pixels
-      );
-    };
-    reader.readAsArrayBuffer(input.files[0]);
-  };
-  document.body.append(input);
-  input.click();
-  input.remove();
-}
-
-function save() {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, cellsTextures.currentFramebuffer);
-  const pixels = new Uint8Array(width * height);
-  gl.readPixels(0, 0, width, height, gl.RED, gl.UNSIGNED_BYTE, pixels);
-  const blob = new Blob([pixels]);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  const dateTimeStr = (new Date).toISOString()
-    .replace(/\..*$/, "")
-    .replaceAll("-", "")
-    .replaceAll(":", "");
-  a.download = `palc_${dateTimeStr}.dat`;
-  a.style.display = "none";
-  document.body.append(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
 onload = async () => {
-  {
-    const style = document.createElement("style");
-    style.innerHTML = `
-      .control-panel {
-        display: flex;
-        align-items: center;
-      }
-      .control-panel > div {
-        display: flex;
-        margin: 8px;
-        align-items: center;
-      }
-      .control-panel button {
-        box-sizing: border-box;
-        padding: 2px;
-        margin: 2px;
-      }
-      .control-panel button > img {
-        display: block;
-        width: 15px;
-        height: 15px;
-      }
-      .control-panel input[type="radio"] {
-        appearance: none;
-        position: absolute;
-      }
-      .control-panel input[type="radio"] + img {
-        display: block;
-        width: 15px;
-        height: 15px;
-        padding: 2px;
-        border: 2px solid transparent;
-        border-radius: 3px;
-      }
-      .control-panel input[type="radio"]:checked + img {
-        border-color: #888;
-      }
-    `;
-    document.head.append(style);
-  }
-  {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <div class="control-panel">
-        <div>
-          <button id="zoom-out-button"><img src="icon/minus_icon.svg"></button>
-          <span id="zoom-ratio" style="display: inline-block; width: 32px; text-align: center;"></span>
-          <button id="zoom-in-button"><img src="icon/plus_icon.svg"></button>
-        </div>
-        <div>
-          <select id="hz-select">
-            <option value="0">0Hz</option>
-            <option value="1">1Hz</option>
-            <option value="3">3Hz</option>
-            <option value="6">6Hz</option>
-            <option value="12">12Hz</option>
-            <option value="30">30Hz</option>
-            <option value="60" selected>60Hz</option>
-            <option value="120">120Hz</option>
-            <option value="300">300Hz</option>
-            <option value="600">600Hz</option>
-            <option value="1200">1.2KHz</option>
-            <option value="3000">3.0KHz</option>
-            <option value="6000">6.0KHz</option>
-          </select>
-        </div>
-        <div>
-          <button id="earth-button" title="Earth GND"><img src="icon/earth_icon.svg"></button>
-        </div>
-        <div>
-          <button id="load-button">Load</button>
-          <button id="save-button">Save</button>
-        </div>
-      </div>
-      <div class="control-panel">
-        <div>
-          <div><label title="Scroll">
-            <input name="pointer-action-kind" type="radio" value="Scroll" checked>
-            <img src="icon/scroll_icon.svg">
-          </label></div>
-          <div><label title="Draw">
-            <input name="pointer-action-kind" type="radio" value="Draw">
-            <img src="icon/draw_icon.svg">
-          </label></div>
-          <div><label title="Select">
-            <input name="pointer-action-kind" type="radio" value="Select">
-            <img src="icon/select_icon.svg">
-          </label></div>
-          <div><label title="Paste">
-            <input name="pointer-action-kind" type="radio" value="Paste">
-            <img src="icon/paste_icon.svg">
-          </label></div>
-          <div><label title="Signal">
-            <input name="pointer-action-kind" type="radio" value="Signal">
-            <img src="icon/signal_icon.svg">
-          </label></div>
-        </div>
-        <div>
-          <div><label title="None">
-            <input name="cell-kind" type="radio" value="None">
-            <img src="icon/none_icon.svg">
-          </label></div>
-          <div><label title="Wire">
-            <input name="cell-kind" type="radio" value="Wire" checked>
-            <img src="icon/wire_icon.svg">
-          </label></div>
-          <div><label title="Wire-Cross">
-            <input name="cell-kind" type="radio" value="WireCross">
-            <img src="icon/wire_cross_icon.svg">
-          </label></div>
-          <div><label title="In-AND">
-            <input name="cell-kind" type="radio" value="InAnd">
-            <img src="icon/in_and_icon.svg">
-          </label></div>
-          <div><label title="In-OR">
-            <input name="cell-kind" type="radio" value="InOr">
-            <img src="icon/in_or_icon.svg">
-          </label></div>
-          <div><label title="In-XOR">
-            <input name="cell-kind" type="radio" value="InXor">
-            <img src="icon/in_xor_icon.svg">
-          </label></div>
-          <div><label title="Out">
-            <input name="cell-kind" type="radio" value="Out">
-            <img src="icon/out_icon.svg">
-            </label></div>
-          <div><label title="Out-NOT">
-            <input name="cell-kind" type="radio" value="OutNot">
-            <img src="icon/out_not_icon.svg">
-          </label></div>
-        </div>
-      <div>
-    `;
-    div.querySelector("#earth-button").onclick = () => {
-      shaderProgram.doEditCommand(
-        gl,
-        cellsTextures.nextFramebuffer,
-        cellsTextures.currentTexture,
-        "Earth",
-        {}
-      );
-      cellsTextures.advance();
-    };
-    div.querySelector("#load-button").onclick = () => load();
-    div.querySelector("#save-button").onclick = () => save();
-    const zoom = (sign) => {
-      if (zoom !== 0) {
-        targetZoomLevel = Math.min(Math.max(0, targetZoomLevel + sign), 6);
-      }
-      div.querySelector("#zoom-ratio").innerHTML = "x" + Math.pow(2, targetZoomLevel);
-    };
-    zoom(0);
-    div.querySelector("#zoom-out-button").onclick = () => zoom(-1);
-    div.querySelector("#zoom-in-button").onclick = () => zoom(+1);
-    document.body.append(div);
-  }
+  controlPanel.initialize();
   {
     const main = document.createElement("main");
     document.body.append(main);
   }
   {
+    const width = cellsTextures.width;
+    const height = cellsTextures.height;
     const canvas = document.createElement("canvas");
     canvas.style.imageRendering = "pixelated";
     canvas.width = width;
@@ -677,7 +472,7 @@ onload = async () => {
     initGl();
   }
   //prepareList();
-  await loadSample();
+  await saveLoad.loadSample();
   requestAnimationFrame(update);
 };
 
@@ -802,6 +597,8 @@ function update() {
     restFrameCountToUpdate = 0;
   }
   if (0) for (let i = 0; i < updateCount; ++i) {
+    const width = cellsTextures.width;
+    const height = cellsTextures.height;
     if (circuitData) {
       const cycleCount = circuitData.cycleCount;
       const inputCount = circuitData.inputCount;
@@ -844,6 +641,7 @@ function update() {
     }
   }
   {
+    const targetZoomLevel = controlPanel.targetZoomLevel;
     zoomLevel += (targetZoomLevel - zoomLevel) / 8;
     if (Math.abs(zoomLevel - targetZoomLevel) < 1 / 256) {
       zoomLevel = targetZoomLevel;

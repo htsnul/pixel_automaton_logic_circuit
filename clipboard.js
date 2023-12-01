@@ -1,8 +1,8 @@
 class Clipboard {
   #width = 0;
   #height = 0;
-  #texture = null;
-  #effectiveSize = { x: 0, y: 0 };
+  texture = null;
+  effectiveSize = { x: 0, y: 0 };
   constructor() {}
   initialize(gl, width, height) {
     this.#width = width;
@@ -22,17 +22,14 @@ class Clipboard {
     );
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    this.#texture = tex;
+    this.texture = tex;
   }
 
-  get texture() { return this.#texture; }
-  get effectiveSize() { return this.#effectiveSize; }
-  
   copyFrom(gl, framebuffer, rect) {
-   gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     const width = this.#width;
     const height = this.#height;
-    gl.bindTexture(gl.TEXTURE_2D, this.#texture);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
     gl.copyTexSubImage2D(
       gl.TEXTURE_2D, 0,
       0, 0,
@@ -67,7 +64,7 @@ class Clipboard {
         overflow.x, overflow.y
       );
     }
-    this.#effectiveSize = { x: rect.width, y: rect.height };
+    this.effectiveSize = { x: rect.width, y: rect.height };
   }
 }
 
