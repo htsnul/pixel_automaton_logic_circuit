@@ -1,4 +1,6 @@
-import { shaderProgram } from "./shaderProgram.js"
+import { updateShader } from "./shader/updateShader.js"
+import { editShader } from "./shader/editShader.js"
+import { renderShader } from "./shader/renderShader.js"
 import { cellsTextures } from "./cellsTextures.js"
 import { cellTextureUtil } from "./cellTextureUtil.js"
 import { clipboard } from "./clipboard.js"
@@ -160,7 +162,9 @@ async function loadCircuit(filename) {
 
 function initGl() {
   const gl = canvas.webGLRenderingContext;
-  shaderProgram.initialize(gl);
+  updateShader.initialize(gl);
+  editShader.initialize(gl);
+  renderShader.initialize(gl);
   cellsTextures.initialize(gl);
   clipboard.initialize(gl, cellsTextures.width, cellsTextures.height);
   buffer = gl.createBuffer();
@@ -169,9 +173,9 @@ function initGl() {
 function updateGl() {
   const gl = canvas.webGLRenderingContext;
   gl.bindFramebuffer(gl.FRAMEBUFFER, cellsTextures.nextFramebuffer);
-  gl.useProgram(shaderProgram.programForUpdate);
+  gl.useProgram(updateShader.program);
   gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
-  gl.uniform1i(gl.getUniformLocation(shaderProgram.programForUpdate, "uSampler"), 0);
+  gl.uniform1i(gl.getUniformLocation(updateShader.program, "uSampler"), 0);
   gl.drawArrays(gl.POINTS, 0, 1);
   cellsTextures.advance();
 }
@@ -179,7 +183,7 @@ function updateGl() {
 function renderGl() {
   const gl = canvas.webGLRenderingContext;
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.useProgram(shaderProgram.programForRender);
+  gl.useProgram(renderShader.program);
   if (0) {
     gl.enableVertexAttribArray(0);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -189,9 +193,9 @@ function renderGl() {
     const position = camera.position;
     const width = cellsTextures.width;
     gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
-    gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
-    gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uWidth"), width);
-    gl.uniform2fv(gl.getUniformLocation(shaderProgram.programForRender, "uPosition"), [position.x, position.y]);
+    gl.uniform1i(gl.getUniformLocation(renderShader.program, "uSampler"), 0);
+    gl.uniform1f(gl.getUniformLocation(renderShader.program, "uWidth"), width);
+    gl.uniform2fv(gl.getUniformLocation(renderShader.program, "uPosition"), [position.x, position.y]);
     {
       const pointerActionKind = controlPanel.getCurrentPointerActionKind();
       const isOverlayCellEnabled = (
@@ -199,13 +203,13 @@ function renderGl() {
         pointerActionKind === "Signal"
       );
       gl.uniform1i(
-        gl.getUniformLocation(shaderProgram.programForRender, "uOverlayCellIsEnabled"),
+        gl.getUniformLocation(renderShader.program, "uOverlayCellIsEnabled"),
         isOverlayCellEnabled
       );
       if (isOverlayCellEnabled) {
         const pointerPosInTexCoord = cellTextureUtil.positionInWorldToTexture(pointer.positionInWorld);
         gl.uniform2fv(
-          gl.getUniformLocation(shaderProgram.programForRender, "uOverlayCellPosition"),
+          gl.getUniformLocation(renderShader.program, "uOverlayCellPosition"),
           [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
         );
         const cellValue = (() => {
@@ -216,7 +220,7 @@ function renderGl() {
           }
         })();
         gl.uniform1i(
-          gl.getUniformLocation(shaderProgram.programForRender, "uOverlayCellValue"),
+          gl.getUniformLocation(renderShader.program, "uOverlayCellValue"),
           cellValue
         );
       }
@@ -225,7 +229,7 @@ function renderGl() {
       const pointerActionKind = controlPanel.getCurrentPointerActionKind();
       const isSelectionEnabled = pointerActionKind === "Select";
       gl.uniform1i(
-        gl.getUniformLocation(shaderProgram.programForRender, "uSelectionIsEnabled"),
+        gl.getUniformLocation(renderShader.program, "uSelectionIsEnabled"),
         isSelectionEnabled
       );
       if (isSelectionEnabled) {
@@ -233,11 +237,11 @@ function renderGl() {
           selection.positionStartInWorld, selection.positionEndInWorld
         );
         gl.uniform2fv(
-          gl.getUniformLocation(shaderProgram.programForRender, "uSelectionRectPosition"),
+          gl.getUniformLocation(renderShader.program, "uSelectionRectPosition"),
           [selectionRect.x, selectionRect.y]
         );
         gl.uniform2fv(
-          gl.getUniformLocation(shaderProgram.programForRender, "uSelectionRectSize"),
+          gl.getUniformLocation(renderShader.program, "uSelectionRectSize"),
           [selectionRect.width, selectionRect.height]
         );
       }
@@ -246,27 +250,27 @@ function renderGl() {
       const pointerActionKind = controlPanel.getCurrentPointerActionKind();
       const isOverlayPasteEnabled = pointerActionKind === "Paste";
       gl.uniform1i(
-        gl.getUniformLocation(shaderProgram.programForRender, "uOverlayPasteIsEnabled"),
+        gl.getUniformLocation(renderShader.program, "uOverlayPasteIsEnabled"),
         isOverlayPasteEnabled
       );
       if (isOverlayPasteEnabled) {
         {
           gl.activeTexture(gl.TEXTURE1);
           gl.bindTexture(gl.TEXTURE_2D, clipboard.texture);
-          gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uClipboardSampler"), 1);
+          gl.uniform1i(gl.getUniformLocation(renderShader.program, "uClipboardSampler"), 1);
           gl.activeTexture(gl.TEXTURE0);
         }
         const pointerPosInTex = cellTextureUtil.positionInWorldToTexture(
           pointer.positionInWorld
         );
         gl.uniform2fv(
-          gl.getUniformLocation(shaderProgram.programForRender, "uOverlayPastePosition"),
+          gl.getUniformLocation(renderShader.program, "uOverlayPastePosition"),
           [pointerPosInTex.x, pointerPosInTex.y]
         );
       }
     }
     const scale = camera.getScale();
-    gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uScale"), scale);
+    gl.uniform1f(gl.getUniformLocation(renderShader.program, "uScale"), scale);
   }
   gl.drawArrays(gl.POINTS, 0, 1);
 }
@@ -455,14 +459,17 @@ function update() {
   }
   for (let i = 0; i < updateCount; ++i) {
     updateGl();
-    if (controlPanel.getCurrentPointerActionKind() === "Signal" && isDragging) {
-      shaderProgram.doEditCommand(
+    if (controlPanel.getCurrentPointerActionKind() === "Signal" && pointer.isDragging) {
+      const gl = canvas.webGLRenderingContext;
+      editShader.doEditCommand(
         gl,
         cellsTextures.nextFramebuffer,
         cellsTextures.currentTexture,
         "Signal",
         {
-          position: cellTextureUtil.positionInWorldToTexture(pointerPosInWorld)
+          position: cellTextureUtil.positionInWorldToTexture(
+            pointer.positionInWorld
+          )
         }
       );
       cellsTextures.advance();

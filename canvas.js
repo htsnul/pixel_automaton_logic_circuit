@@ -4,8 +4,8 @@ import { clipboard } from "./clipboard.js"
 import { controlPanel } from "./controlPanel.js"
 import { pointer } from "./pointer.js"
 import { camera } from "./camera.js"
-import { shaderProgram } from "./shaderProgram.js"
 import { selection } from "./selection.js"
+import { editShader } from "./shader/editShader.js"
 
 class Canvas {
   #canvasElement;
@@ -35,7 +35,7 @@ class Canvas {
     const pointerActionKind = controlPanel.getCurrentPointerActionKind();
     if (pointerActionKind === "Draw") {
       const gl = this.webGLRenderingContext;
-      shaderProgram.doEditCommand(
+      editShader.doEditCommand(
         gl,
         cellsTextures.nextFramebuffer,
         cellsTextures.currentTexture,
@@ -51,7 +51,7 @@ class Canvas {
       selection.positionEndInWorld = pointer.positionInWorld;
     } else if (pointerActionKind === "Paste") {
       const gl = this.webGLRenderingContext;
-      shaderProgram.doEditCommand(
+      editShader.doEditCommand(
         gl,
         cellsTextures.nextFramebuffer,
         cellsTextures.currentTexture,
@@ -82,7 +82,7 @@ class Canvas {
       camera.position.y -= event.movementY / scale;
     } else if (pointerActionKind === "Draw") {
       const gl = this.webGLRenderingContext;
-      shaderProgram.doEditCommand(
+      editShader.doEditCommand(
         gl,
         cellsTextures.nextFramebuffer,
         cellsTextures.currentTexture,

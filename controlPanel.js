@@ -1,7 +1,7 @@
-import { shaderProgram } from "./shaderProgram.js"
 import { cellsTextures } from "./cellsTextures.js"
 import { saveLoad } from "./saveLoad.js"
 import { cellValueUtil } from "./cellValueUtil.js"
+import { editShader } from "./shader/editShader.js"
 
 class ControlPanel {
   targetZoomLevel = 4.0;
@@ -138,7 +138,7 @@ class ControlPanel {
     `;
     div.querySelector("#earth-button").onclick = () => {
       const gl = document.querySelector("canvas").getContext("webgl2");
-      shaderProgram.doEditCommand(
+      editShader.doEditCommand(
         gl,
         cellsTextures.nextFramebuffer,
         cellsTextures.currentTexture,
