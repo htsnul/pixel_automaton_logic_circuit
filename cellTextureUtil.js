@@ -6,8 +6,8 @@ export const cellTextureUtil = {
     const height = cellsTextures.height;
     const mod = (x, y) => x - y * Math.floor(x / y);
     return {
-      x: Math.floor(mod(pos.x, width)) + 0.5,
-      y: Math.floor(mod(pos.y, height)) + 0.5
+      x: mod(pos.x, width),
+      y: mod(pos.y, height)
     };
   },
   getRectInTextureFromPositionStartEnd: (posS, posE) => {

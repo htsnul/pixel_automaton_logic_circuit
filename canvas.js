@@ -20,11 +20,19 @@ class Canvas {
     canvas.height = height;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    canvas.onpointerenter = (event) => this.#onPointerEnter(event);
+    canvas.onpointerleave = (event) => this.#onPointerLeave(event);
     canvas.onpointerdown = (event) => this.#onPointerDown(event);
     canvas.onpointermove = (event) => this.#onPointerMove(event);
     canvas.onpointerup = (event) => this.#onPointerUp(event);
     document.querySelector("main").append(canvas);
     this.webGLRenderingContext = canvas.getContext("webgl2");
+  }
+  #onPointerEnter(event) {
+    pointer.isOnCanvas = true;
+  }
+  #onPointerLeave(event) {
+    pointer.isOnCanvas = false;
   }
   #onPointerDown(event) {
     pointer.isDragging = true;

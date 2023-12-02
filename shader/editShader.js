@@ -24,7 +24,7 @@ const fragmentShaderSource = `#version 300 es
     vec4 col = texture(uSampler, gl_FragCoord.xy / texW);
     int cellVal = cellValueFromColorComponent(col[0]);
     if (uCommandKind == CommandKindDraw) {
-      if (gl_FragCoord.xy != uPosition) {
+      if (floor(gl_FragCoord.xy) != floor(uPosition)) {
         fragColor[0] = cellValueToColorComponent(cellVal);
         return;
       }
@@ -40,7 +40,7 @@ const fragmentShaderSource = `#version 300 es
       return;
     }
     if (uCommandKind == CommandKindSignal) {
-      if (gl_FragCoord.xy != uPosition) {
+      if (floor(gl_FragCoord.xy) != floor(uPosition)) {
         fragColor[0] = cellValueToColorComponent(cellVal);
         return;
       }
@@ -52,16 +52,17 @@ const fragmentShaderSource = `#version 300 es
       return;
     }
     if (uCommandKind == CommandKindPaste) {
+      vec2 pos = mod(round(vec2(uPosition - uSize / 2.0)), texW);
       if (
         (
-          (uPosition.x <= gl_FragCoord.x && gl_FragCoord.x < uPosition.x + uSize.x) ||
-          (uPosition.x <= gl_FragCoord.x + texW && gl_FragCoord.x + texW < uPosition.x + uSize.x)
+          (pos.x <= gl_FragCoord.x && gl_FragCoord.x < pos.x + uSize.x) ||
+          (pos.x <= gl_FragCoord.x + texW && gl_FragCoord.x + texW < pos.x + uSize.x)
         ) && (
-          (uPosition.y <= gl_FragCoord.y && gl_FragCoord.y < uPosition.y + uSize.y) ||
-          (uPosition.y <= gl_FragCoord.y + texW && gl_FragCoord.y + texW < uPosition.y + uSize.y)
+          (pos.y <= gl_FragCoord.y && gl_FragCoord.y < pos.y + uSize.y) ||
+          (pos.y <= gl_FragCoord.y + texW && gl_FragCoord.y + texW < pos.y + uSize.y)
         )
       ) {
-        vec4 col = texture(uClipboardSampler, (gl_FragCoord.xy - uPosition) / texW);
+        vec4 col = texture(uClipboardSampler, (gl_FragCoord.xy - pos) / texW);
         int cellVal = cellValueFromColorComponent(col[0]);
         fragColor[0] = cellValueToColorComponent(cellVal);
         return;

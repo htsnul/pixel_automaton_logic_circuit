@@ -84,88 +84,80 @@ function render() {
   const gl = canvas.webGLRenderingContext;
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.useProgram(renderShader.program);
-  {
-    const position = camera.position;
-    const width = cellsTextures.width;
-    gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
-    gl.uniform1i(gl.getUniformLocation(renderShader.program, "uSampler"), 0);
-    gl.uniform1f(gl.getUniformLocation(renderShader.program, "uWidth"), width);
-    gl.uniform2fv(gl.getUniformLocation(renderShader.program, "uPosition"), [position.x, position.y]);
-    {
-      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
-      const isOverlayCellEnabled = (
-        pointerActionKind === "Draw" ||
-        pointerActionKind === "Signal"
-      );
-      gl.uniform1i(
-        gl.getUniformLocation(renderShader.program, "uOverlayCellIsEnabled"),
-        isOverlayCellEnabled
-      );
-      if (isOverlayCellEnabled) {
-        const pointerPosInTexCoord = cellTextureUtil.positionInWorldToTexture(pointer.positionInWorld);
-        gl.uniform2fv(
-          gl.getUniformLocation(renderShader.program, "uOverlayCellPosition"),
-          [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
-        );
-        const cellValue = (() => {
-          if (pointerActionKind === "Draw") {
-            return controlPanel.getCurrentCellValue();
-          } else if (pointerActionKind === "Signal") {
-            return cellValueUtil.createCellValue("Wire", true);
-          }
-        })();
-        gl.uniform1i(
-          gl.getUniformLocation(renderShader.program, "uOverlayCellValue"),
-          cellValue
-        );
+  gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
+  gl.uniform1i(gl.getUniformLocation(renderShader.program, "uSampler"), 0);
+  const width = cellsTextures.width;
+  gl.uniform1f(gl.getUniformLocation(renderShader.program, "uWidth"), width);
+  const position = camera.position;
+  gl.uniform2fv(gl.getUniformLocation(renderShader.program, "uPosition"), [position.x, position.y]);
+  const scale = camera.getScale();
+  gl.uniform1f(gl.getUniformLocation(renderShader.program, "uScale"), scale);
+  const pointerActionKind = controlPanel.getCurrentPointerActionKind();
+  const isOverlayCellEnabled = (
+    pointer.isOnCanvas && (
+      pointerActionKind === "Draw" ||
+      pointerActionKind === "Signal"
+    )
+  );
+  gl.uniform1i(
+    gl.getUniformLocation(renderShader.program, "uOverlayCellIsEnabled"),
+    isOverlayCellEnabled
+  );
+  if (isOverlayCellEnabled) {
+    const pointerPosInTexCoord = cellTextureUtil.positionInWorldToTexture(pointer.positionInWorld);
+    gl.uniform2fv(
+      gl.getUniformLocation(renderShader.program, "uOverlayCellPosition"),
+      [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
+    );
+    const cellValue = (() => {
+      if (pointerActionKind === "Draw") {
+        return controlPanel.getCurrentCellValue();
+      } else if (pointerActionKind === "Signal") {
+        return cellValueUtil.createCellValue("Wire", true);
       }
-    }
+    })();
+    gl.uniform1i(
+      gl.getUniformLocation(renderShader.program, "uOverlayCellValue"),
+      cellValue
+    );
+  }
+  const isSelectionEnabled = pointerActionKind === "Select";
+  gl.uniform1i(
+    gl.getUniformLocation(renderShader.program, "uSelectionIsEnabled"),
+    isSelectionEnabled
+  );
+  if (isSelectionEnabled) {
+    const selectionRect = cellTextureUtil.getRectInTextureFromPositionStartEnd(
+      selection.positionStartInWorld, selection.positionEndInWorld
+    );
+    gl.uniform2fv(
+      gl.getUniformLocation(renderShader.program, "uSelectionRectPosition"),
+      [selectionRect.x, selectionRect.y]
+    );
+    gl.uniform2fv(
+      gl.getUniformLocation(renderShader.program, "uSelectionRectSize"),
+      [selectionRect.width, selectionRect.height]
+    );
+  }
+  const isOverlayPasteEnabled = pointer.isOnCanvas && pointerActionKind === "Paste";
+  gl.uniform1i(
+    gl.getUniformLocation(renderShader.program, "uOverlayPasteIsEnabled"),
+    isOverlayPasteEnabled
+  );
+  if (isOverlayPasteEnabled) {
     {
-      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
-      const isSelectionEnabled = pointerActionKind === "Select";
-      gl.uniform1i(
-        gl.getUniformLocation(renderShader.program, "uSelectionIsEnabled"),
-        isSelectionEnabled
-      );
-      if (isSelectionEnabled) {
-        const selectionRect = cellTextureUtil.getRectInTextureFromPositionStartEnd(
-          selection.positionStartInWorld, selection.positionEndInWorld
-        );
-        gl.uniform2fv(
-          gl.getUniformLocation(renderShader.program, "uSelectionRectPosition"),
-          [selectionRect.x, selectionRect.y]
-        );
-        gl.uniform2fv(
-          gl.getUniformLocation(renderShader.program, "uSelectionRectSize"),
-          [selectionRect.width, selectionRect.height]
-        );
-      }
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, clipboard.texture);
+      gl.uniform1i(gl.getUniformLocation(renderShader.program, "uClipboardSampler"), 1);
+      gl.activeTexture(gl.TEXTURE0);
     }
-    {
-      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
-      const isOverlayPasteEnabled = pointerActionKind === "Paste";
-      gl.uniform1i(
-        gl.getUniformLocation(renderShader.program, "uOverlayPasteIsEnabled"),
-        isOverlayPasteEnabled
-      );
-      if (isOverlayPasteEnabled) {
-        {
-          gl.activeTexture(gl.TEXTURE1);
-          gl.bindTexture(gl.TEXTURE_2D, clipboard.texture);
-          gl.uniform1i(gl.getUniformLocation(renderShader.program, "uClipboardSampler"), 1);
-          gl.activeTexture(gl.TEXTURE0);
-        }
-        const pointerPosInTex = cellTextureUtil.positionInWorldToTexture(
-          pointer.positionInWorld
-        );
-        gl.uniform2fv(
-          gl.getUniformLocation(renderShader.program, "uOverlayPastePosition"),
-          [pointerPosInTex.x, pointerPosInTex.y]
-        );
-      }
-    }
-    const scale = camera.getScale();
-    gl.uniform1f(gl.getUniformLocation(renderShader.program, "uScale"), scale);
+    const pointerPosInTex = cellTextureUtil.positionInWorldToTexture(
+      pointer.positionInWorld
+    );
+    gl.uniform2fv(
+      gl.getUniformLocation(renderShader.program, "uOverlayPastePosition"),
+      [pointerPosInTex.x, pointerPosInTex.y]
+    );
   }
   gl.drawArrays(gl.POINTS, 0, 1);
 }

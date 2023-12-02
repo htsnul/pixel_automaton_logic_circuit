@@ -30,7 +30,7 @@ const fragmentShaderSource = `#version 300 es
     posInTex = mod(posInTex, uWidth);
     vec4 col = texture(uSampler, posInTex / uWidth);
     int cellVal = cellValueFromColorComponent(col[0]);
-    if (uOverlayCellIsEnabled && floor(posInTex) + vec2(0.5) == uOverlayCellPosition) {
+    if (uOverlayCellIsEnabled && floor(posInTex) == floor(uOverlayCellPosition)) {
       cellVal = uOverlayCellValue;
     }
     vec2 selectionRectBegin = uSelectionRectPosition;
@@ -74,8 +74,8 @@ const fragmentShaderSource = `#version 300 es
       cellVal = makeCellValue(CellKindWire, CellWireKindWire, true, true, true, true);
     }
     if (uOverlayPasteIsEnabled) {
-      vec2 pos = vec2(floor(uOverlayPastePosition));
       vec2 size = uSelectionRectSize;
+      vec2 pos = mod(round(vec2(uOverlayPastePosition - size / 2.0)), uWidth);
       if (
         (
           (
