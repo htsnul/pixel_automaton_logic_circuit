@@ -1,9 +1,14 @@
 import { shaderProgram } from "./shaderProgram.js"
 import { cellsTextures } from "./cellsTextures.js"
+import { cellTextureUtil } from "./cellTextureUtil.js"
 import { clipboard } from "./clipboard.js"
 import { controlPanel } from "./controlPanel.js"
 import { saveLoad } from "./saveLoad.js"
 import { cellValueUtil } from "./cellValueUtil.js"
+import { canvas } from "./canvas.js"
+import { camera } from "./camera.js"
+import { pointer } from "./pointer.js"
+import { selection } from "./selection.js"
 
 const circuitFilenames = [
   "logic_gates.json",
@@ -23,8 +28,6 @@ const circuitFilenames = [
   "delay.json",
   "7_segment_display.json"
 ];
-let gl;
-
 let buffer;
 
 let cells = [];
@@ -32,12 +35,8 @@ let circuitData;
 let frameIndex = 0;
 let clockIsOn = false;
 
-let position = { x: 0, y: 0 };
-let zoomLevel = 4.0;
-let pointerPosInWorld = { x: 0, y: 0 };
 let selectionPosStartInWorld = { x: 0, y: 0 };
 let selectionPosEndInWorld = { x: 0, y: 0 };
-let isDragging = false;
 
 let restFrameCountToUpdate = 0;
 
@@ -160,8 +159,7 @@ async function loadCircuit(filename) {
 }
 
 function initGl() {
-  const canvas = document.querySelector("canvas");
-  gl = canvas.getContext("webgl2");
+  const gl = canvas.webGLRenderingContext;
   shaderProgram.initialize(gl);
   cellsTextures.initialize(gl);
   clipboard.initialize(gl, cellsTextures.width, cellsTextures.height);
@@ -169,6 +167,7 @@ function initGl() {
 }
 
 function updateGl() {
+  const gl = canvas.webGLRenderingContext;
   gl.bindFramebuffer(gl.FRAMEBUFFER, cellsTextures.nextFramebuffer);
   gl.useProgram(shaderProgram.programForUpdate);
   gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
@@ -178,6 +177,7 @@ function updateGl() {
 }
 
 function renderGl() {
+  const gl = canvas.webGLRenderingContext;
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.useProgram(shaderProgram.programForRender);
   if (0) {
@@ -186,6 +186,7 @@ function renderGl() {
     gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
   }
   {
+    const position = camera.position;
     const width = cellsTextures.width;
     gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
     gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uSampler"), 0);
@@ -202,7 +203,7 @@ function renderGl() {
         isOverlayCellEnabled
       );
       if (isOverlayCellEnabled) {
-        const pointerPosInTexCoord = positionInWorldToTexCoord(pointerPosInWorld);
+        const pointerPosInTexCoord = cellTextureUtil.positionInWorldToTexture(pointer.positionInWorld);
         gl.uniform2fv(
           gl.getUniformLocation(shaderProgram.programForRender, "uOverlayCellPosition"),
           [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
@@ -228,8 +229,8 @@ function renderGl() {
         isSelectionEnabled
       );
       if (isSelectionEnabled) {
-        const selectionRect = getRectInTexCoordFromPositionStartEnd(
-          selectionPosStartInWorld, selectionPosEndInWorld
+        const selectionRect = cellTextureUtil.getRectInTextureFromPositionStartEnd(
+          selection.positionStartInWorld, selection.positionEndInWorld
         );
         gl.uniform2fv(
           gl.getUniformLocation(shaderProgram.programForRender, "uSelectionRectPosition"),
@@ -255,14 +256,16 @@ function renderGl() {
           gl.uniform1i(gl.getUniformLocation(shaderProgram.programForRender, "uClipboardSampler"), 1);
           gl.activeTexture(gl.TEXTURE0);
         }
-        const pointerPosInTexCoord = positionInWorldToTexCoord(pointerPosInWorld);
+        const pointerPosInTex = cellTextureUtil.positionInWorldToTexture(
+          pointer.positionInWorld
+        );
         gl.uniform2fv(
           gl.getUniformLocation(shaderProgram.programForRender, "uOverlayPastePosition"),
-          [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
+          [pointerPosInTex.x, pointerPosInTex.y]
         );
       }
     }
-    const scale = Math.pow(2, zoomLevel);
+    const scale = camera.getScale();
     gl.uniform1f(gl.getUniformLocation(shaderProgram.programForRender, "uScale"), scale);
   }
   gl.drawArrays(gl.POINTS, 0, 1);
@@ -288,165 +291,14 @@ function prepareList() {
   document.querySelector("main").append(ul);
 }
 
-function positionInCanvasToWorld(posInCanvas) {
-  const width = cellsTextures.width;
-  const height = cellsTextures.height;
-  const scale = Math.pow(2, zoomLevel);
-  return {
-    x: (posInCanvas.x - 0.5 * width) / scale - position.x,
-    y: height - (posInCanvas.y - 0.5 * height) / scale - position.y
-  };
-}
-
-function positionInWorldToTexCoord(pos) {
-  const width = cellsTextures.width;
-  const height = cellsTextures.height;
-  const mod = (x, y) => x - y * Math.floor(x / y);
-  return {
-    x: Math.floor(mod(pos.x, width)) + 0.5,
-    y: Math.floor(mod(pos.y, height)) + 0.5
-  };
-}
-
-function getRectInTexCoordFromPositionStartEnd(posS, posE) {
-  const width = cellsTextures.width;
-  const height = cellsTextures.height;
-  const mod = (x, y) => x - y * Math.floor(x / y);
-  const posMinInWorld = {
-    x: Math.min(posS.x, posE.x),
-    y: Math.min(posS.y, posE.y)
-  };
-  const posMaxInWorld = {
-    x: Math.max(posS.x, posE.x),
-    y: Math.max(posS.y, posE.y)
-  };
-  const posMinInTexCoord = positionInWorldToTexCoord(posMinInWorld);
-  const posMaxInTexCoord = positionInWorldToTexCoord(posMaxInWorld);
-  if (posMaxInTexCoord.x < posMinInTexCoord.x) {
-    posMaxInTexCoord.x += width;
-  }
-  if (posMaxInTexCoord.y < posMinInTexCoord.y) {
-    posMaxInTexCoord.y += height;
-  }
-  const beginInTexCoord = {
-    x: Math.floor(posMinInTexCoord.x),
-    y: Math.floor(posMinInTexCoord.y)
-  };
-  const endInTexCoord = {
-    x: Math.ceil(posMaxInTexCoord.x),
-    y: Math.ceil(posMaxInTexCoord.y)
-  };
-  return {
-    x: beginInTexCoord.x,
-    y: beginInTexCoord.y,
-    width: endInTexCoord.x - beginInTexCoord.x,
-    height: endInTexCoord.y - beginInTexCoord.y
-  };
-}
-
 onload = async () => {
   controlPanel.initialize();
   {
     const main = document.createElement("main");
     document.body.append(main);
   }
-  {
-    const width = cellsTextures.width;
-    const height = cellsTextures.height;
-    const canvas = document.createElement("canvas");
-    canvas.style.imageRendering = "pixelated";
-    canvas.width = width;
-    canvas.height = height;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    const getPositionInCanvasFromEvent = (event) => {
-      const canvasClientRect = canvas.getBoundingClientRect();
-      return {
-        x: event.clientX - canvasClientRect.x,
-        y: event.clientY - canvasClientRect.y
-      };
-    };
-    canvas.onpointerdown = (event) => {
-      isDragging = true;
-      canvas.setPointerCapture(event.pointerId);
-      pointerPosInWorld = positionInCanvasToWorld(getPositionInCanvasFromEvent(event));
-      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
-      if (pointerActionKind === "Draw") {
-        shaderProgram.doEditCommand(
-          gl,
-          cellsTextures.nextFramebuffer,
-          cellsTextures.currentTexture,
-          "Draw",
-          {
-            position: positionInWorldToTexCoord(pointerPosInWorld),
-            cellValue: controlPanel.getCurrentCellValue()
-          }
-        );
-        cellsTextures.advance();
-      } else if (pointerActionKind === "Select") {
-        selectionPosStartInWorld = pointerPosInWorld;
-        selectionPosEndInWorld = pointerPosInWorld;
-      } else if (pointerActionKind === "Paste") {
-        shaderProgram.doEditCommand(
-          gl,
-          cellsTextures.nextFramebuffer,
-          cellsTextures.currentTexture,
-          "Paste",
-          {
-            position: positionInWorldToTexCoord(pointerPosInWorld),
-            size: clipboard.effectiveSize,
-            clipboardTexture: clipboard.texture
-          }
-        );
-        cellsTextures.advance();
-      }
-      event.preventDefault();
-    }
-    canvas.onpointermove = (event) => {
-      pointerPosInWorld = positionInCanvasToWorld(getPositionInCanvasFromEvent(event));
-      if (!isDragging) {
-        return;
-      }
-      const pointerActionKind = controlPanel.getCurrentPointerActionKind();
-      if (pointerActionKind === "Scroll") {
-        const scale = Math.pow(2, zoomLevel);
-        position.x += event.movementX / scale;
-        position.y -= event.movementY / scale;
-      } else if (pointerActionKind === "Draw") {
-        shaderProgram.doEditCommand(
-          gl,
-          cellsTextures.nextFramebuffer,
-          cellsTextures.currentTexture,
-          "Draw",
-          {
-            position: positionInWorldToTexCoord(pointerPosInWorld),
-            cellValue: controlPanel.getCurrentCellValue()
-          }
-        );
-        cellsTextures.advance();
-      } else if (pointerActionKind === "Select") {
-        selectionPosEndInWorld = pointerPosInWorld;
-      }
-      event.preventDefault();
-    }
-    canvas.onpointerup = (event) => {
-      pointerPosInWorld = positionInCanvasToWorld(getPositionInCanvasFromEvent(event));
-      if (!isDragging) {
-        return;
-      }
-      if (controlPanel.getCurrentPointerActionKind() === "Select") {
-        selectionPosEndInWorld = pointerPosInWorld;
-        const rect = getRectInTexCoordFromPositionStartEnd(
-          selectionPosStartInWorld, selectionPosEndInWorld
-        );
-        clipboard.copyFrom(gl, cellsTextures.currentFramebuffer, rect);
-      }
-      isDragging = false;
-      event.preventDefault();
-    }
-    document.querySelector("main").append(canvas);
-    initGl();
-  }
+  canvas.initialize();
+  initGl();
   //prepareList();
   await saveLoad.loadSample();
   requestAnimationFrame(update);
@@ -610,19 +462,13 @@ function update() {
         cellsTextures.currentTexture,
         "Signal",
         {
-          position: positionInWorldToTexCoord(pointerPosInWorld)
+          position: cellTextureUtil.positionInWorldToTexture(pointerPosInWorld)
         }
       );
       cellsTextures.advance();
     }
   }
-  {
-    const targetZoomLevel = controlPanel.targetZoomLevel;
-    zoomLevel += (targetZoomLevel - zoomLevel) / 8;
-    if (Math.abs(zoomLevel - targetZoomLevel) < 1 / 256) {
-      zoomLevel = targetZoomLevel;
-    }
-  }
+  camera.update();
   if (0) {
     const canvas = document.querySelector("canvas");
     const ctx = canvas.getContext("2d");
