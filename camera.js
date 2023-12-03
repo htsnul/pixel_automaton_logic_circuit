@@ -2,7 +2,7 @@ import { controlPanel } from "./controlPanel.js"
 
 class Camera {
   position = { x: 0, y: 0 };
-  zoomLevel = 4.0;
+  zoomLevel = 3.0;
   getScale() {
     return Math.pow(2, this.zoomLevel);
   }

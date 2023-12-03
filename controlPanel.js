@@ -4,7 +4,7 @@ import { cellValueUtil } from "./cellValueUtil.js"
 import { editShader } from "./shader/editShader.js"
 
 class ControlPanel {
-  targetZoomLevel = 4.0;
+  targetZoomLevel = 3.0;
   initialize() {
     const style = document.createElement("style");
     style.innerHTML = `
