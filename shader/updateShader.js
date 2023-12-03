@@ -67,23 +67,23 @@ const fragmentShaderSource = `#version 300 es
       ));
       return;
     }
-    if (kind == CellKindComponent) {
+    if (kind == CellKindIn) {
       bool signaled = false;
-      if (subKind == CellComponentKindAnd) {
+      if (subKind == CellInKindAnd) {
         signaled = (
           (tKind == CellKindWire ? tSignalB : true) &&
           (bKind == CellKindWire ? bSignalT : true) &&
           (rKind == CellKindWire ? rSignalL : true) &&
           (lKind == CellKindWire ? lSignalR : true)
         );
-      } else if (subKind == CellComponentKindOr) {
+      } else if (subKind == CellInKindOr) {
         signaled = (
           (tKind == CellKindWire && tSignalB) ||
           (bKind == CellKindWire && bSignalT) ||
           (rKind == CellKindWire && rSignalL) ||
           (lKind == CellKindWire && lSignalR)
         );
-      } else if (subKind == CellComponentKindXor) {
+      } else if (subKind == CellInKindXor) {
         signaled = (
           ((tKind == CellKindWire && tSignalB) ? 1 : 0) +
           ((bKind == CellKindWire && bSignalT) ? 1 : 0) +
@@ -102,10 +102,10 @@ const fragmentShaderSource = `#version 300 es
     }
     if (kind == CellKindOut) {
       bool signaled = (
-        (tKind == CellKindComponent && tSignalB) ||
-        (bKind == CellKindComponent && bSignalT) ||
-        (rKind == CellKindComponent && rSignalL) ||
-        (lKind == CellKindComponent && lSignalR)
+        (tKind == CellKindIn && tSignalB) ||
+        (bKind == CellKindIn && bSignalT) ||
+        (rKind == CellKindIn && rSignalL) ||
+        (lKind == CellKindIn && lSignalR)
       );
       bool signal = (subKind == CellOutKindInvOut) ? !signaled : signaled;
       fragColor[0] = cellValueToColorComponent(makeCellValue(

@@ -136,15 +136,15 @@ const fragmentShaderSource = `#version 300 es
       vec4 color = vec4(8.0, 12.0, 8.0, 16.0) / 16.0;
       fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 2.0 : 0.0);
       return;
-    } else if (kind == CellKindComponent && subKind == CellComponentKindAnd) {
+    } else if (kind == CellKindIn && subKind == CellInKindAnd) {
       vec4 color = vec4(16.0, 12.0, 8.0, 16.0) / 16.0;
       fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
       return;
-    } else if (kind == CellKindComponent && subKind == CellComponentKindOr) {
+    } else if (kind == CellKindIn && subKind == CellInKindOr) {
       vec4 color = vec4(8.0, 12.0, 16.0, 16.0) / 16.0;
       fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
       return;
-    } else if (kind == CellKindComponent && subKind == CellComponentKindXor) {
+    } else if (kind == CellKindIn && subKind == CellInKindXor) {
       vec4 color = vec4(16.0, 8.0, 16.0, 16.0) / 16.0;
       fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
       return;
