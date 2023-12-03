@@ -57,6 +57,21 @@ class Canvas {
     } else if (pointerActionKind === "Select") {
       selection.positionStartInWorld = pointer.positionInWorld;
       selection.positionEndInWorld = pointer.positionInWorld;
+    } else if (pointerActionKind === "ToggleOrSignal") {
+      const gl = this.webGLRenderingContext;
+      editShader.doEditCommand(
+        gl,
+        cellsTextures.nextFramebuffer,
+        cellsTextures.currentTexture,
+        "Toggle",
+        {
+          position: cellTextureUtil.positionInWorldToTexture(
+            pointer.positionInWorld
+          ),
+        }
+      );
+      cellsTextures.advance();
+      console.log("a");
     } else if (pointerActionKind === "Paste") {
       const gl = this.webGLRenderingContext;
       editShader.doEditCommand(

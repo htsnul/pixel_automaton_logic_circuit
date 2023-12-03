@@ -5,8 +5,9 @@ const fragmentShaderSource = `#version 300 es
 
   int CommandKindDraw = 0;
   int CommandKindEarth = 1;
-  int CommandKindSignal = 2;
-  int CommandKindPaste = 3;
+  int CommandKindToggle = 2;
+  int CommandKindSignal = 3;
+  int CommandKindPaste = 4;
 
   uniform sampler2D uSampler;
   uniform sampler2D uClipboardSampler;
@@ -39,12 +40,36 @@ const fragmentShaderSource = `#version 300 es
       ));
       return;
     }
+    if (uCommandKind == CommandKindToggle) {
+      if (floor(gl_FragCoord.xy) != floor(uPosition)) {
+        fragColor[0] = cellValueToColorComponent(cellVal);
+        return;
+      }
+      int kind = getCellKind(cellVal);
+      if (kind != CellKindOut) {
+        fragColor[0] = cellValueToColorComponent(cellVal);
+        return;
+      }
+      int subKind = (
+        getCellSubKind(cellVal) == CellOutKindOut
+        ? CellOutKindInvOut
+        : CellOutKindOut
+      );
+      fragColor[0] = cellValueToColorComponent(makeCellValue(
+        kind, subKind, false, false, false, false
+      ));
+      return;
+    }
     if (uCommandKind == CommandKindSignal) {
       if (floor(gl_FragCoord.xy) != floor(uPosition)) {
         fragColor[0] = cellValueToColorComponent(cellVal);
         return;
       }
       int kind = getCellKind(cellVal);
+      if (kind != CellKindWire) {
+        fragColor[0] = cellValueToColorComponent(cellVal);
+        return;
+      }
       int subKind = getCellSubKind(cellVal);
       fragColor[0] = cellValueToColorComponent(makeCellValue(
         kind, subKind, true, true, true, true
@@ -93,8 +118,9 @@ class EditShader {
       switch (kind) {
         case "Draw": return 0;
         case "Earth": return 1;
-        case "Signal": return 2;
-        case "Paste": return 3;
+        case "Toggle": return 2;
+        case "Signal": return 3;
+        case "Paste": return 4;
       }
     })();
     gl.uniform1i(gl.getUniformLocation(this.program, "uSampler"), 0);

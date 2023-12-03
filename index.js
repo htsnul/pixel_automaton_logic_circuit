@@ -63,7 +63,7 @@ function updateCells() {
   gl.uniform1i(gl.getUniformLocation(updateShader.program, "uSampler"), 0);
   gl.drawArrays(gl.POINTS, 0, 1);
   cellsTextures.advance();
-  if (controlPanel.getCurrentPointerActionKind() === "Signal" && pointer.isDragging) {
+  if (controlPanel.getCurrentPointerActionKind() === "ToggleOrSignal" && pointer.isDragging) {
     const gl = canvas.webGLRenderingContext;
     editShader.doEditCommand(
       gl,
@@ -93,12 +93,7 @@ function render() {
   const scale = camera.getScale();
   gl.uniform1f(gl.getUniformLocation(renderShader.program, "uScale"), scale);
   const pointerActionKind = controlPanel.getCurrentPointerActionKind();
-  const isOverlayCellEnabled = (
-    pointer.isOnCanvas && (
-      pointerActionKind === "Draw" ||
-      pointerActionKind === "Signal"
-    )
-  );
+  const isOverlayCellEnabled = pointer.isOnCanvas && pointerActionKind === "Draw";
   gl.uniform1i(
     gl.getUniformLocation(renderShader.program, "uOverlayCellIsEnabled"),
     isOverlayCellEnabled
@@ -112,13 +107,25 @@ function render() {
     const cellValue = (() => {
       if (pointerActionKind === "Draw") {
         return controlPanel.getCurrentCellValue();
-      } else if (pointerActionKind === "Signal") {
+      } else if (pointerActionKind === "ToggleOrSignal") {
         return cellValueUtil.createCellValue("Wire", true);
       }
     })();
     gl.uniform1i(
       gl.getUniformLocation(renderShader.program, "uOverlayCellValue"),
       cellValue
+    );
+  }
+  const isOverlaySignalEnabled = pointer.isOnCanvas && pointerActionKind === "ToggleOrSignal";
+  gl.uniform1i(
+    gl.getUniformLocation(renderShader.program, "uOverlaySignalIsEnabled"),
+    isOverlaySignalEnabled
+  );
+  if (isOverlaySignalEnabled) {
+    const pointerPosInTexCoord = cellTextureUtil.positionInWorldToTexture(pointer.positionInWorld);
+    gl.uniform2fv(
+      gl.getUniformLocation(renderShader.program, "uOverlaySignalPosition"),
+      [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
     );
   }
   const isSelectionEnabled = pointerActionKind === "Select";

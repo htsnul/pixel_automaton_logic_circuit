@@ -11,6 +11,8 @@ const fragmentShaderSource = `#version 300 es
   uniform bool uOverlayCellIsEnabled;
   uniform vec2 uOverlayCellPosition;
   uniform int uOverlayCellValue;
+  uniform bool uOverlaySignalIsEnabled;
+  uniform vec2 uOverlaySignalPosition;
   uniform bool uSelectionIsEnabled;
   uniform vec2 uSelectionRectPosition;
   uniform vec2 uSelectionRectSize;
@@ -32,6 +34,11 @@ const fragmentShaderSource = `#version 300 es
     int cellVal = cellValueFromColorComponent(col[0]);
     if (uOverlayCellIsEnabled && floor(posInTex) == floor(uOverlayCellPosition)) {
       cellVal = uOverlayCellValue;
+    }
+    if (uOverlaySignalIsEnabled && floor(posInTex) == floor(uOverlaySignalPosition)) {
+      int kind = getCellKind(cellVal);
+      int subKind = getCellSubKind(cellVal);
+      cellVal = makeCellValue(kind, subKind, true, true, true, true);
     }
     vec2 selectionRectBegin = uSelectionRectPosition;
     vec2 selectionRectEnd = uSelectionRectPosition + uSelectionRectSize;

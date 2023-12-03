@@ -95,8 +95,8 @@ class ControlPanel {
             <input name="pointer-action-kind" type="radio" value="Paste">
             <img src="icon/paste_icon.svg">
           </label></div>
-          <div><label title="Signal">
-            <input name="pointer-action-kind" type="radio" value="Signal">
+          <div><label title="Toggle or Signal">
+            <input name="pointer-action-kind" type="radio" value="ToggleOrSignal">
             <img src="icon/signal_icon.svg">
           </label></div>
         </div>
