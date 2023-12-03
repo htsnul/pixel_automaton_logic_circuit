@@ -47,10 +47,10 @@ const fragmentShaderSource = `#version 300 es
           ) && (
             (
               selectionRectBegin.x <= posInTex.x &&
-              posInTex.x <= selectionRectEnd.x
+              posInTex.x < selectionRectEnd.x
             ) || (
               selectionRectBegin.x <= posInTex.x + uWidth &&
-              posInTex.x + uWidth <= selectionRectEnd.x
+              posInTex.x + uWidth < selectionRectEnd.x
             )
           )
         ) || (
@@ -62,10 +62,10 @@ const fragmentShaderSource = `#version 300 es
           ) && (
             (
               selectionRectBegin.y <= posInTex.y &&
-              posInTex.y <= selectionRectEnd.y
+              posInTex.y < selectionRectEnd.y
             ) || (
               selectionRectBegin.y <= posInTex.y + uWidth &&
-              posInTex.y + uWidth <= selectionRectEnd.y
+              posInTex.y + uWidth < selectionRectEnd.y
             )
           )
         )
