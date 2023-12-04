@@ -20,6 +20,7 @@ class Canvas {
     canvas.height = height;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    canvas.style.touchAction = "none";
     canvas.onpointerenter = (event) => this.#onPointerEnter(event);
     canvas.onpointerleave = (event) => this.#onPointerLeave(event);
     canvas.onpointerdown = (event) => this.#onPointerDown(event);
