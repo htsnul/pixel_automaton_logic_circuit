@@ -152,7 +152,7 @@ const fragmentShaderSource = `#version 300 es
       vec4 color = vec4(8.0, 8.0, 16.0, 16.0) / 16.0;
       fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
       return;
-    } else if (kind == CellKindOut && subKind == CellOutKindInvOut) {
+    } else if (kind == CellKindOut && subKind == CellOutKindNot) {
       vec4 color = vec4(16.0, 8.0, 8.0, 16.0) / 16.0;
       fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
       return;

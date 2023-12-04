@@ -18,7 +18,7 @@ const commonUtilSource = `
   const int CellInKindOr = 1;
   const int CellInKindXor = 2;
   const int CellOutKindOut = 0;
-  const int CellOutKindInvOut = 1;
+  const int CellOutKindNot = 1;
 
   int cellValueFromColorComponent(float col) { return int(255.0 * col + 0.5); }
   float cellValueToColorComponent(int val) { return float(val) / 255.0; }
