@@ -11,13 +11,13 @@ const commonUtilSource = `
   const int CellKindWire = 1;
   const int CellKindIn = 2;
   const int CellKindOut = 3;
-  const int CellWireKindWire = 0;
+  const int CellWireKindNormal = 0;
   const int CellWireKindCross = 1;
   const int CellWireKindOne = 2;
   const int CellInKindAnd = 0;
   const int CellInKindOr = 1;
   const int CellInKindXor = 2;
-  const int CellOutKindOut = 0;
+  const int CellOutKindNormal = 0;
   const int CellOutKindNot = 1;
 
   int cellValueFromColorComponent(float col) { return int(255.0 * col + 0.5); }

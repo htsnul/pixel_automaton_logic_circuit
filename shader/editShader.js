@@ -51,9 +51,9 @@ const fragmentShaderSource = `#version 300 es
         return;
       }
       int subKind = (
-        getCellSubKind(cellVal) == CellOutKindOut
+        getCellSubKind(cellVal) == CellOutKindNormal
         ? CellOutKindNot
-        : CellOutKindOut
+        : CellOutKindNormal
       );
       fragColor[0] = cellValueToColorComponent(makeCellValue(
         kind, subKind, false, false, false, false

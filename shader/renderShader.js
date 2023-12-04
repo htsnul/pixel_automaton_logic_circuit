@@ -78,7 +78,7 @@ const fragmentShaderSource = `#version 300 es
         )
       )
     ) {
-      cellVal = makeCellValue(CellKindWire, CellWireKindWire, true, true, true, true);
+      cellVal = makeCellValue(CellKindWire, CellWireKindNormal, true, true, true, true);
     }
     if (uOverlayPasteIsEnabled) {
       vec2 size = uSelectionRectSize;
@@ -128,7 +128,7 @@ const fragmentShaderSource = `#version 300 es
     );
     vec4 normalColor = vec4(0.2, 0.2, 0.2, 1.0);
     vec4 signalColor = vec4(0.2, 0.2, 0.2, 1.0);
-    if (kind == CellKindWire && subKind == CellWireKindWire) {
+    if (kind == CellKindWire && subKind == CellWireKindNormal) {
       vec4 color = vec4(8.0, 8.0, 8.0, 16.0) / 16.0;
       fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 2.0 : 0.0);
       return;
@@ -148,7 +148,7 @@ const fragmentShaderSource = `#version 300 es
       vec4 color = vec4(16.0, 8.0, 16.0, 16.0) / 16.0;
       fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
       return;
-    } else if (kind == CellKindOut && subKind == CellOutKindOut) {
+    } else if (kind == CellKindOut && subKind == CellOutKindNormal) {
       vec4 color = vec4(8.0, 8.0, 16.0, 16.0) / 16.0;
       fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 16.0 : 0.0);
       return;

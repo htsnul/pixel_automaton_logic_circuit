@@ -38,7 +38,7 @@ const fragmentShaderSource = `#version 300 es
     int lKind = getCellKind(cellValL);
     int lSubKind = getCellSubKind(cellValL);
     bool lSignalR = getCellSignalR(cellValL);
-    if (kind == CellKindWire && subKind == CellWireKindWire) {
+    if (kind == CellKindWire && subKind == CellWireKindNormal) {
       bool signaled = tSignalB || bSignalT || rSignalL || lSignalR;
       fragColor[0] = cellValueToColorComponent(makeCellValue(
         kind, subKind,
