@@ -21,6 +21,8 @@ class Canvas {
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     canvas.style.touchAction = "none";
+    canvas.style.userSelect = "none";
+    canvas.style.webkitUserSelect = "none";
     canvas.onpointerenter = (event) => this.#onPointerEnter(event);
     canvas.onpointerleave = (event) => this.#onPointerLeave(event);
     canvas.onpointerdown = (event) => this.#onPointerDown(event);
@@ -38,9 +40,8 @@ class Canvas {
   #onPointerDown(event) {
     pointer.isDragging = true;
     this.#canvasElement.setPointerCapture(event.pointerId);
-    pointer.positionInWorld = this.#positionInCanvasToWorld(
-      this.#getPositionInCanvasFromPointerEvent(event)
-    );
+    pointer.positionInCanvas = this.#getPositionInCanvasFromPointerEvent(event);
+    const pointerPosInWorld = pointer.getPositionInWorld();
     const pointerActionKind = controlPanel.getCurrentPointerActionKind();
     if (pointerActionKind === "Draw") {
       const gl = this.webGLRenderingContext;
@@ -50,14 +51,14 @@ class Canvas {
         cellsTextures.currentTexture,
         "Draw",
         {
-          position: cellTextureUtil.positionInWorldToTexture(pointer.positionInWorld),
+          position: cellTextureUtil.positionInWorldToTexture(pointerPosInWorld),
           cellValue: controlPanel.getCurrentCellValue()
         }
       );
       cellsTextures.advance();
     } else if (pointerActionKind === "Select") {
-      selection.positionStartInWorld = pointer.positionInWorld;
-      selection.positionEndInWorld = pointer.positionInWorld;
+      selection.positionStartInWorld = pointerPosInWorld;
+      selection.positionEndInWorld = pointerPosInWorld;
     } else if (pointerActionKind === "ToggleOrSignal") {
       const gl = this.webGLRenderingContext;
       editShader.doEditCommand(
@@ -67,12 +68,11 @@ class Canvas {
         "Toggle",
         {
           position: cellTextureUtil.positionInWorldToTexture(
-            pointer.positionInWorld
+            pointerPosInWorld
           ),
         }
       );
       cellsTextures.advance();
-      console.log("a");
     } else if (pointerActionKind === "Paste") {
       const gl = this.webGLRenderingContext;
       editShader.doEditCommand(
@@ -82,7 +82,7 @@ class Canvas {
         "Paste",
         {
           position: cellTextureUtil.positionInWorldToTexture(
-            pointer.positionInWorld
+            pointerPosInWorld
           ),
           size: clipboard.effectiveSize,
           clipboardTexture: clipboard.texture
@@ -93,17 +93,21 @@ class Canvas {
     event.preventDefault();
   }
   #onPointerMove(event) {
-    pointer.positionInWorld = this.#positionInCanvasToWorld(
-      this.#getPositionInCanvasFromPointerEvent(event)
-    );
+    const pointerPosInCanvasPrev = pointer.positionInCanvas;
+    pointer.positionInCanvas = this.#getPositionInCanvasFromPointerEvent(event);
+    const pointerPosInWorld = pointer.getPositionInWorld();
     if (!pointer.isDragging) {
       return;
     }
     const pointerActionKind = controlPanel.getCurrentPointerActionKind();
     if (pointerActionKind === "Scroll") {
       const scale = camera.getScale();
-      camera.position.x += event.movementX / scale;
-      camera.position.y -= event.movementY / scale;
+      const delta = {
+        x: pointer.positionInCanvas.x - pointerPosInCanvasPrev.x,
+        y: pointer.positionInCanvas.y - pointerPosInCanvasPrev.y
+      };
+      camera.position.x += delta.x / scale;
+      camera.position.y -= delta.y / scale;
     } else if (pointerActionKind === "Draw") {
       const gl = this.webGLRenderingContext;
       editShader.doEditCommand(
@@ -112,25 +116,24 @@ class Canvas {
         cellsTextures.currentTexture,
         "Draw",
         {
-          position: cellTextureUtil.positionInWorldToTexture(pointer.positionInWorld),
+          position: cellTextureUtil.positionInWorldToTexture(pointerPosInWorld),
           cellValue: controlPanel.getCurrentCellValue()
         }
       );
       cellsTextures.advance();
     } else if (pointerActionKind === "Select") {
-      selection.positionEndInWorld = pointer.positionInWorld;
+      selection.positionEndInWorld = pointerPosInWorld;
     }
     event.preventDefault();
   }
   #onPointerUp(event) {
-    pointer.positionInWorld = this.#positionInCanvasToWorld(
-      this.#getPositionInCanvasFromPointerEvent(event)
-    );
+    pointer.positionInCanvas = this.#getPositionInCanvasFromPointerEvent(event);
+    const pointerPosInWorld = pointer.getPositionInWorld();
     if (!pointer.isDragging) {
       return;
     }
     if (controlPanel.getCurrentPointerActionKind() === "Select") {
-      selection.positionEndInWorld = pointer.positionInWorld;
+      selection.positionEndInWorld = pointerPosInWorld;
       const rect = cellTextureUtil.getRectInTextureFromPositionStartEnd(
         selection.positionStartInWorld, selection.positionEndInWorld
       );
@@ -145,16 +148,6 @@ class Canvas {
     return {
       x: event.clientX - canvasClientRect.x,
       y: event.clientY - canvasClientRect.y
-    };
-  }
-  #positionInCanvasToWorld(posInCanvas) {
-    const width = cellsTextures.width;
-    const height = cellsTextures.height;
-    const position = camera.position;
-    const scale = camera.getScale();
-    return {
-      x: (posInCanvas.x - 0.5 * width) / scale - position.x,
-      y: height - (posInCanvas.y - 0.5 * height) / scale - position.y
     };
   }
 }

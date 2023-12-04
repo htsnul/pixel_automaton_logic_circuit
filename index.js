@@ -65,6 +65,7 @@ function updateCells() {
   cellsTextures.advance();
   if (controlPanel.getCurrentPointerActionKind() === "ToggleOrSignal" && pointer.isDragging) {
     const gl = canvas.webGLRenderingContext;
+    const pointerPosInWorld = pointer.getPositionInWorld();
     editShader.doEditCommand(
       gl,
       cellsTextures.nextFramebuffer,
@@ -72,7 +73,7 @@ function updateCells() {
       "Signal",
       {
         position: cellTextureUtil.positionInWorldToTexture(
-          pointer.positionInWorld
+          pointerPosInWorld
         )
       }
     );
@@ -82,6 +83,7 @@ function updateCells() {
 
 function render() {
   const gl = canvas.webGLRenderingContext;
+  const pointerPosInWorld = pointer.getPositionInWorld();
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.useProgram(renderShader.program);
   gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
@@ -99,7 +101,7 @@ function render() {
     isOverlayCellEnabled
   );
   if (isOverlayCellEnabled) {
-    const pointerPosInTexCoord = cellTextureUtil.positionInWorldToTexture(pointer.positionInWorld);
+    const pointerPosInTexCoord = cellTextureUtil.positionInWorldToTexture(pointerPosInWorld);
     gl.uniform2fv(
       gl.getUniformLocation(renderShader.program, "uOverlayCellPosition"),
       [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
@@ -122,7 +124,7 @@ function render() {
     isOverlaySignalEnabled
   );
   if (isOverlaySignalEnabled) {
-    const pointerPosInTexCoord = cellTextureUtil.positionInWorldToTexture(pointer.positionInWorld);
+    const pointerPosInTexCoord = cellTextureUtil.positionInWorldToTexture(pointerPosInWorld);
     gl.uniform2fv(
       gl.getUniformLocation(renderShader.program, "uOverlaySignalPosition"),
       [pointerPosInTexCoord.x, pointerPosInTexCoord.y]
@@ -159,7 +161,7 @@ function render() {
       gl.activeTexture(gl.TEXTURE0);
     }
     const pointerPosInTex = cellTextureUtil.positionInWorldToTexture(
-      pointer.positionInWorld
+      pointerPosInWorld
     );
     gl.uniform2fv(
       gl.getUniformLocation(renderShader.program, "uOverlayPastePosition"),
