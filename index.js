@@ -61,7 +61,7 @@ function updateCells() {
   gl.useProgram(updateShader.program);
   gl.bindTexture(gl.TEXTURE_2D, cellsTextures.currentTexture);
   gl.uniform1i(gl.getUniformLocation(updateShader.program, "uSampler"), 0);
-  gl.drawArrays(gl.POINTS, 0, 1);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   cellsTextures.advance();
   if (controlPanel.getCurrentPointerActionKind() === "ToggleOrSignal" && pointer.isDragging) {
     const gl = canvas.webGLRenderingContext;
@@ -168,6 +168,6 @@ function render() {
       [pointerPosInTex.x, pointerPosInTex.y]
     );
   }
-  gl.drawArrays(gl.POINTS, 0, 1);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 

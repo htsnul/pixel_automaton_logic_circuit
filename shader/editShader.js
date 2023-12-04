@@ -140,7 +140,7 @@ class EditShader {
       gl.uniform1i(gl.getUniformLocation(this.program, "uClipboardSampler"), 1);
       gl.activeTexture(gl.TEXTURE0);
     }
-    gl.drawArrays(gl.POINTS, 0, 1);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 }
 
