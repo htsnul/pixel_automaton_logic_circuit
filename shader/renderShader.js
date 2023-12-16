@@ -130,11 +130,11 @@ const fragmentShaderSource = `#version 300 es
     vec4 signalColor = vec4(0.2, 0.2, 0.2, 1.0);
     if (kind == CellKindWire && subKind == CellWireKindNormal) {
       vec4 color = vec4(8.0, 8.0, 8.0, 16.0) / 16.0;
-      fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 2.0 : 0.0);
+      fragColor = mix(color, vec4(1.0), signaling ? 3.0 / 4.0 : 0.0);
       return;
     } else if (kind == CellKindWire && subKind == CellWireKindCross) {
       vec4 color = vec4(8.0, 12.0, 8.0, 16.0) / 16.0;
-      fragColor = mix(color, vec4(1.0), signaling ? 1.0 / 2.0 : 0.0);
+      fragColor = mix(color, vec4(1.0), signaling ? 3.0 / 4.0 : 0.0);
       return;
     } else if (kind == CellKindIn && subKind == CellInKindAnd) {
       vec4 color = vec4(16.0, 12.0, 8.0, 16.0) / 16.0;
